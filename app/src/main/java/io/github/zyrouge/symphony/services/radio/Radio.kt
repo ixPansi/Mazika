@@ -186,21 +186,48 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
             if (symphony.settings.requireAudioFocus.value && !hasFocus) {
                 return
             }
-            if (it.fadePlayback) {
+            // A fresh track start is governed by the main "fade playback" option; a
+            // resume (unpause) additionally requires "fade on pause and resume".
+            // hasPlayedOnce is false only before the very first start() of this
+            // player, so it distinguishes a fresh start from a resume.
+            val isResume = it.hasPlayedOnce
+            val shouldFadeIn = it.fadePlayback &&
+                    (!isResume || symphony.settings.fadeOnPauseResume.value)
+            if (shouldFadeIn) {
                 it.changeVolumeInstant(RadioPlayer.MIN_VOLUME)
+                it.changeVolume(RadioPlayer.MAX_VOLUME) {}
+            } else {
+                // Guarantee full volume so playback never resumes silently after a
+                // previous fade-out left the volume reduced.
+                it.changeVolumeInstant(RadioPlayer.MAX_VOLUME)
             }
-            it.changeVolume(RadioPlayer.MAX_VOLUME) {}
             it.start()
             onUpdate.dispatch(
                 when {
-                    !it.hasPlayedOnce -> Events.Player.Started
+                    !isResume -> Events.Player.Started
                     else -> Events.Player.Resumed
                 }
             )
         }
     }
 
-    fun pause() = pause {}
+    fun pause() {
+        if (symphony.settings.fadeOnPauseResume.value) {
+            // Fades out only if the main "fade playback" option is also on; when it
+            // is off, changeVolume() applies the volume change instantly.
+            pause(forceFade = false) {}
+        } else {
+            // Immediate pause with no fade-out, regardless of the main fade option.
+            player?.let {
+                if (!it.isPlaying) {
+                    return@let
+                }
+                it.pause()
+                focus.abandonFocus()
+                onUpdate.dispatch(Events.Player.Paused)
+            }
+        }
+    }
 
     private fun pause(forceFade: Boolean = false, onFinish: () -> Unit) {
         player?.let {

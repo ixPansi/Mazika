@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.CenterFocusWeak
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MotionPhotosPaused
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.HeadsetOff
 import androidx.compose.material.icons.filled.PlayArrow
@@ -46,6 +47,7 @@ object PlayerSettingsViewRoute
 fun PlayerSettingsView(context: ViewContext) {
     val scrollState = rememberScrollState()
     val fadePlayback by context.symphony.settings.fadePlayback.flow.collectAsState()
+    val fadeOnPauseResume by context.symphony.settings.fadeOnPauseResume.flow.collectAsState()
     val fadePlaybackDuration by context.symphony.settings.fadePlaybackDuration.flow.collectAsState()
     val requireAudioFocus by context.symphony.settings.requireAudioFocus.flow.collectAsState()
     val ignoreAudioFocusLoss by context.symphony.settings.ignoreAudioFocusLoss.flow.collectAsState()
@@ -102,6 +104,25 @@ fun PlayerSettingsView(context: ViewContext) {
                         value = fadePlayback,
                         onChange = { value ->
                             context.symphony.settings.fadePlayback.setValue(value)
+                        }
+                    )
+                    // MAZIKA: dependent option nested under "Fade playback". It is
+                    // disabled (but keeps its stored value) when the main option is
+                    // off, and controls only user-initiated pause/resume fades.
+                    SettingsSwitchTile(
+                        enabled = fadePlayback,
+                        icon = {
+                            Icon(Icons.Filled.MotionPhotosPaused, null)
+                        },
+                        title = {
+                            Text(context.symphony.t.FadeOnPauseResume)
+                        },
+                        subtitle = {
+                            Text(context.symphony.t.FadeOnPauseResumeDescription)
+                        },
+                        value = fadeOnPauseResume,
+                        onChange = { value ->
+                            context.symphony.settings.fadeOnPauseResume.setValue(value)
                         }
                     )
                     HorizontalDivider()

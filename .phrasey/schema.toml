@@ -180,6 +180,12 @@ name = "All"
 name = "FadePlaybackInOut"
 
 [[keys]]
+name = "FadeOnPauseResume"
+
+[[keys]]
+name = "FadeOnPauseResumeDescription"
+
+[[keys]]
 name = "RequireAudioFocus"
 
 [[keys]]

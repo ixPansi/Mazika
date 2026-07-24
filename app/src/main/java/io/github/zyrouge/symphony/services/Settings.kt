@@ -256,6 +256,13 @@ class Settings(private val symphony: Symphony) {
     val minSongDuration = IntEntry("min_song_duration", 0)
     val checkForUpdates = BooleanEntry("check_for_updates", false)
     val fadePlayback = BooleanEntry("fade_playback", false)
+
+    // MAZIKA: dependent option controlling whether a user-initiated pause/resume
+    // fades. Defaults to true so existing users keep the previous fade behaviour
+    // when the main "fade playback" option is on. Only takes effect while
+    // [fadePlayback] is on; track-transition and forced (sleep-timer) fades are
+    // unaffected by this setting.
+    val fadeOnPauseResume = BooleanEntry("fade_on_pause_resume", true)
     val requireAudioFocus = BooleanEntry("require_audio_focus", true)
     val ignoreAudioFocusLoss = BooleanEntry("ignore_audio_focus_loss", false)
     val playOnHeadphonesConnect = BooleanEntry("play_on_headphones_connect", false)
