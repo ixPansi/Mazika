@@ -44,7 +44,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.findByName("release")
+            // MAZIKA: only sign the release build when a keystore is supplied via
+            // environment variables (see SIGNING.md). Otherwise leave it unsigned so
+            // `assembleRelease` still produces an (unsigned) APK instead of failing.
+            signingConfig = System.getenv("SIGNING_KEYSTORE_FILE")
+                ?.let { signingConfigs.findByName("release") }
             ndk {
                 debugSymbolLevel = "FULL"
             }
@@ -119,6 +123,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.core)
     implementation(libs.core.splashscreen)
+    implementation(libs.exifinterface)
     implementation(libs.fuzzywuzzy)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.lifecycle.runtime)

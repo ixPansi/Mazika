@@ -22,3 +22,6 @@ app/src/main/assets/i18n
 dist
 secrets
 .kotlin
+
+# MAZIKA build artefacts (installable APKs; checksums are in IMPLEMENTATION_REPORT.md)
+artifacts/*.apk
