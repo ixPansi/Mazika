@@ -137,9 +137,9 @@ object PlaylistCovers {
         }
     }
 
-    private fun sanitizeId(id: String) = id.replace(Regex("[^A-Za-z0-9_-]"), "_")
+    internal fun sanitizeId(id: String) = id.replace(Regex("[^A-Za-z0-9_-]"), "_")
 
-    private fun calculateInSampleSize(width: Int, height: Int, target: Int): Int {
+    internal fun calculateInSampleSize(width: Int, height: Int, target: Int): Int {
         var sample = 1
         var w = width
         var h = height

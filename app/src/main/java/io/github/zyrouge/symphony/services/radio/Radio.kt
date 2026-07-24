@@ -191,8 +191,11 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
             // hasPlayedOnce is false only before the very first start() of this
             // player, so it distinguishes a fresh start from a resume.
             val isResume = it.hasPlayedOnce
-            val shouldFadeIn = it.fadePlayback &&
-                    (!isResume || symphony.settings.fadeOnPauseResume.value)
+            val shouldFadeIn = PlaybackFade.shouldFade(
+                mainFadeEnabled = it.fadePlayback,
+                fadeOnPauseResume = symphony.settings.fadeOnPauseResume.value,
+                isUserPauseResume = isResume,
+            )
             if (shouldFadeIn) {
                 it.changeVolumeInstant(RadioPlayer.MIN_VOLUME)
                 it.changeVolume(RadioPlayer.MAX_VOLUME) {}
@@ -212,12 +215,16 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
     }
 
     fun pause() {
-        if (symphony.settings.fadeOnPauseResume.value) {
-            // Fades out only if the main "fade playback" option is also on; when it
-            // is off, changeVolume() applies the volume change instantly.
-            pause(forceFade = false) {}
+        val shouldFadeOut = PlaybackFade.shouldFade(
+            mainFadeEnabled = symphony.settings.fadePlayback.value,
+            fadeOnPauseResume = symphony.settings.fadeOnPauseResume.value,
+            isUserPauseResume = true,
+        )
+        if (shouldFadeOut) {
+            // We have decided to fade, so force it (the master option is on).
+            pause(forceFade = true) {}
         } else {
-            // Immediate pause with no fade-out, regardless of the main fade option.
+            // Immediate pause with no fade-out.
             player?.let {
                 if (!it.isPlaying) {
                     return@let
