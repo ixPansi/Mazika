@@ -8,12 +8,15 @@ import io.github.zyrouge.symphony.utils.FuzzySearchOption
 import io.github.zyrouge.symphony.utils.FuzzySearcher
 import io.github.zyrouge.symphony.utils.KeyGenerator
 import io.github.zyrouge.symphony.utils.Logger
+import io.github.zyrouge.symphony.utils.PlaylistCovers
 import io.github.zyrouge.symphony.utils.mutate
 import io.github.zyrouge.symphony.utils.withCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.util.concurrent.ConcurrentHashMap
 
@@ -62,7 +65,10 @@ class PlaylistRepository(private val symphony: Symphony) {
                 val playlist = when {
                     x.isLocal -> {
                         ActivityUtils.makePersistableReadableUri(context, x.uri!!)
+                        // Re-parsing a local playlist rebuilds it from its .m3u file,
+                        // so carry over the stored custom cover reference.
                         Playlist.parse(symphony, x.id, x.uri)
+                            .copy(customCoverPath = x.customCoverPath)
                     }
 
                     else -> x
@@ -84,6 +90,11 @@ class PlaylistRepository(private val symphony: Symphony) {
         _favorites.update {
             getFavorites().getSongIds(symphony)
         }
+        // Remove cover files no longer referenced by any playlist.
+        PlaylistCovers.cleanupOrphans(
+            symphony,
+            cache.values.mapNotNull { it.customCoverPath }.toSet(),
+        )
         emitUpdateId()
         emitUpdate(false)
     }
@@ -153,11 +164,8 @@ class PlaylistRepository(private val symphony: Symphony) {
     }
 
     fun delete(id: String) {
-        Logger.error(
-            "PlaylistRepository",
-            "cache ${cache.containsKey(id)}"
-        )
-        cache.remove(id)?.uri?.let {
+        val removed = cache.remove(id)
+        removed?.uri?.let {
             runCatching {
                 ActivityUtils.makePersistableReadableUri(symphony.applicationContext, it)
             }
@@ -169,6 +177,8 @@ class PlaylistRepository(private val symphony: Symphony) {
         emitCount()
         symphony.groove.coroutineScope.launch {
             symphony.database.playlists.delete(id)
+            // Clean up the app-owned custom cover file (never the user's gallery).
+            PlaylistCovers.delete(symphony, removed?.customCoverPath)
         }
     }
 
@@ -180,6 +190,7 @@ class PlaylistRepository(private val symphony: Symphony) {
             songPaths = songIds.mapNotNull { symphony.groove.song.get(it)?.path },
             uri = playlist.uri,
             path = playlist.path,
+            customCoverPath = playlist.customCoverPath,
         )
         cache[id] = updated
         emitUpdateId()
@@ -191,6 +202,44 @@ class PlaylistRepository(private val symphony: Symphony) {
         }
         symphony.groove.coroutineScope.launch {
             symphony.database.playlists.update(updated)
+        }
+    }
+
+    // MAZIKA: persist a user-selected image as this playlist's custom cover. The
+    // heavy decode/resize/write runs off the main thread; onResult is delivered on
+    // the main thread. The previous cover file is deleted only after the new one is
+    // saved and persisted (atomic replacement).
+    fun setCustomCover(playlist: Playlist, sourceUri: android.net.Uri, onResult: (Boolean) -> Unit) {
+        symphony.groove.coroutineScope.launch {
+            val name = PlaylistCovers.saveFromUri(symphony, playlist.id, sourceUri)
+            if (name == null) {
+                withContext(Dispatchers.Main) { onResult(false) }
+                return@launch
+            }
+            val current = get(playlist.id) ?: playlist
+            val previous = current.customCoverPath
+            val updated = current.copy(customCoverPath = name)
+            cache[updated.id] = updated
+            emitUpdateId()
+            symphony.database.playlists.update(updated)
+            if (previous != null && previous != name) {
+                PlaylistCovers.delete(symphony, previous)
+            }
+            withContext(Dispatchers.Main) { onResult(true) }
+        }
+    }
+
+    // MAZIKA: remove a custom cover, restoring the default artwork and deleting the
+    // app-owned image file.
+    fun removeCustomCover(playlist: Playlist) {
+        val current = get(playlist.id) ?: playlist
+        val previous = current.customCoverPath ?: return
+        val updated = current.copy(customCoverPath = null)
+        cache[updated.id] = updated
+        emitUpdateId()
+        symphony.groove.coroutineScope.launch {
+            symphony.database.playlists.update(updated)
+            PlaylistCovers.delete(symphony, previous)
         }
     }
 

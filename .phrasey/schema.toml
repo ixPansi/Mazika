@@ -589,6 +589,24 @@ parameters = ["x"]
 name = "RenamePlaylist"
 
 [[keys]]
+name = "ChangePlaylistCover"
+
+[[keys]]
+name = "RemoveCustomCover"
+
+[[keys]]
+name = "SetAsCover"
+
+[[keys]]
+name = "PlaylistCoverUpdated"
+
+[[keys]]
+name = "PlaylistCoverRemoved"
+
+[[keys]]
+name = "UnableToSavePlaylistCover"
+
+[[keys]]
 name = "Rename"
 
 [[keys]]

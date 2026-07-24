@@ -1,7 +1,9 @@
 package io.github.zyrouge.symphony.ui.components
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -19,15 +21,19 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -173,6 +179,18 @@ fun PlaylistDropdownMenu(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
 
+    // MAZIKA: custom playlist cover picker. Uses the modern Android photo picker,
+    // which automatically falls back to the Storage Access Framework on devices
+    // without it. The selected image is previewed and confirmed before it is saved.
+    var pickedCoverUri by remember { mutableStateOf<Uri?>(null) }
+    val coverPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            pickedCoverUri = uri
+        }
+    }
+
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest
@@ -257,6 +275,39 @@ fun PlaylistDropdownMenu(
                 showInfoDialog = true
             }
         )
+        DropdownMenuItem(
+            leadingIcon = {
+                Icon(Icons.Filled.Image, null)
+            },
+            text = {
+                Text(context.symphony.t.ChangePlaylistCover)
+            },
+            onClick = {
+                onDismissRequest()
+                coverPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            }
+        )
+        if (playlist.hasCustomCover) {
+            DropdownMenuItem(
+                leadingIcon = {
+                    Icon(Icons.Filled.HideImage, null)
+                },
+                text = {
+                    Text(context.symphony.t.RemoveCustomCover)
+                },
+                onClick = {
+                    onDismissRequest()
+                    context.symphony.groove.playlist.removeCustomCover(playlist)
+                    Toast.makeText(
+                        context.activity,
+                        context.symphony.t.PlaylistCoverRemoved,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            )
+        }
         if (playlist.isNotLocal) {
             DropdownMenuItem(
                 leadingIcon = {
@@ -373,6 +424,49 @@ fun PlaylistDropdownMenu(
             onDismissRequest = {
                 showRenameDialog = false
             }
+        )
+    }
+
+    pickedCoverUri?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { pickedCoverUri = null },
+            title = {
+                Text(context.symphony.t.ChangePlaylistCover)
+            },
+            text = {
+                // Square centre-cropped preview matching how the cover will be stored.
+                AsyncImage(
+                    model = uri,
+                    contentDescription = context.symphony.t.ChangePlaylistCover,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(12.dp)),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pickedCoverUri = null
+                        context.symphony.groove.playlist.setCustomCover(playlist, uri) { success ->
+                            Toast.makeText(
+                                context.activity,
+                                if (success) context.symphony.t.PlaylistCoverUpdated
+                                else context.symphony.t.UnableToSavePlaylistCover,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    }
+                ) {
+                    Text(context.symphony.t.SetAsCover)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pickedCoverUri = null }) {
+                    Text(context.symphony.t.Cancel)
+                }
+            },
         )
     }
 }

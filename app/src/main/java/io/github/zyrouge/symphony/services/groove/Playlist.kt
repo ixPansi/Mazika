@@ -4,9 +4,12 @@ import android.net.Uri
 import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import coil.request.ImageRequest
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.ui.helpers.Assets
+import io.github.zyrouge.symphony.ui.helpers.createHandyImageRequest
 import io.github.zyrouge.symphony.utils.DocumentFileX
+import io.github.zyrouge.symphony.utils.PlaylistCovers
 import io.github.zyrouge.symphony.utils.SimplePath
 import kotlin.io.path.Path
 import kotlin.io.path.nameWithoutExtension
@@ -20,15 +23,33 @@ data class Playlist(
     val songPaths: List<String>,
     val uri: Uri?,
     val path: String?,
+    // MAZIKA: relative file name of a user-selected custom cover stored in
+    // internal storage (see [PlaylistCovers]); null means use the default artwork.
+    val customCoverPath: String? = null,
 ) {
     val numberOfTracks: Int get() = songPaths.size
     val isLocal get() = uri != null
     val isNotLocal get() = uri == null
+    val hasCustomCover get() = customCoverPath != null
 
-    fun createArtworkImageRequest(symphony: Symphony) =
-        getSongIds(symphony).firstOrNull()
+    // MAZIKA cover precedence: a valid custom cover, else the generated artwork
+    // (first track), else the default placeholder. A missing custom file falls
+    // through to the generated artwork so a stale reference never blanks the tile.
+    fun createArtworkImageRequest(symphony: Symphony): ImageRequest.Builder {
+        val customCover = customCoverPath
+            ?.let { PlaylistCovers.resolveFile(symphony, it) }
+            ?.takeIf { it.exists() }
+        if (customCover != null) {
+            return createHandyImageRequest(
+                symphony.applicationContext,
+                image = customCover,
+                fallback = Assets.getPlaceholderId(symphony),
+            )
+        }
+        return getSongIds(symphony).firstOrNull()
             ?.let { symphony.groove.song.get(it)?.createArtworkImageRequest(symphony) }
             ?: Assets.createPlaceholderImageRequest(symphony)
+    }
 
     fun getSongIds(symphony: Symphony): List<String> {
         val parentPath = path?.let { SimplePath(it) }?.parent
@@ -55,6 +76,7 @@ data class Playlist(
         songPaths = songPaths,
         uri = uri,
         path = path,
+        customCoverPath = customCoverPath,
     )
 
     companion object {
