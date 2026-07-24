@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.media.audiofx.AudioEffect
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -31,6 +32,9 @@ class RadioSession(val symphony: Symphony) {
     internal val mediaSession = MediaSessionCompat(symphony.applicationContext, MEDIA_SESSION_ID)
     private val artworkCacher = RadioArtworkCacher(symphony)
     private val notification = RadioNotification(symphony)
+
+    // MAZIKA: resolves Android Auto browse/search media ids onto the shared engine.
+    private val browser by lazy { RadioBrowser(symphony) }
 
     private var currentSongId: String? = null
     private var receiver = object : BroadcastReceiver() {
@@ -100,6 +104,25 @@ class RadioSession(val symphony: Symphony) {
                 override fun onSeekTo(pos: Long) {
                     super.onSeekTo(pos)
                     symphony.radio.seek(pos)
+                }
+
+                // MAZIKA: Android Auto / voice playback entry points. They resolve
+                // the stable media id onto a MAZIKA queue via the shared engine, so
+                // the car, phone UI and notification stay in sync and the
+                // pause/resume fade preference is respected.
+                override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                    super.onPlayFromMediaId(mediaId, extras)
+                    mediaId?.let { browser.playFromMediaId(it) }
+                }
+
+                override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
+                    super.onPrepareFromMediaId(mediaId, extras)
+                    mediaId?.let { browser.playFromMediaId(it) }
+                }
+
+                override fun onPlayFromSearch(query: String?, extras: Bundle?) {
+                    super.onPlayFromSearch(query, extras)
+                    browser.playFromSearch(query)
                 }
 
                 override fun onRewind() {
@@ -273,6 +296,10 @@ class RadioSession(val symphony: Symphony) {
                                 or PlaybackStateCompat.ACTION_REWIND
                                 or PlaybackStateCompat.ACTION_FAST_FORWARD
                                 or PlaybackStateCompat.ACTION_SEEK_TO
+                                // MAZIKA: enable Android Auto / voice playback.
+                                or PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
+                                or PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
+                                or PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID
                     )
                     build()
                 }

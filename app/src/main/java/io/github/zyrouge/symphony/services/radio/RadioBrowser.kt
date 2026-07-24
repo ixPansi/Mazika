@@ -1,0 +1,346 @@
+package io.github.zyrouge.symphony.services.radio
+
+import android.net.Uri
+import android.support.v4.media.MediaBrowserCompat.MediaItem
+import android.support.v4.media.MediaDescriptionCompat
+import io.github.zyrouge.symphony.Symphony
+import io.github.zyrouge.symphony.services.groove.Playlist
+import io.github.zyrouge.symphony.utils.SimpleFileSystem
+import io.github.zyrouge.symphony.utils.SimplePath
+
+/**
+ * MAZIKA: builds the Android Auto browse tree and resolves browse/search actions
+ * onto the shared MAZIKA playback engine. It reads the existing in-memory groove
+ * repositories (no rescans, no heavy artwork decoding) and always routes playback
+ * through [RadioShorty]/[Radio], so Android Auto shares one queue and one session
+ * with the phone and respects the pause/resume fade preference.
+ */
+class RadioBrowser(private val symphony: Symphony) {
+    private val context get() = symphony.applicationContext
+
+    fun rootChildren(): List<MediaItem> = buildList {
+        add(category(MediaId.CATEGORY_SONGS, symphony.t.Songs))
+        add(category(MediaId.CATEGORY_ALBUMS, symphony.t.Albums))
+        add(category(MediaId.CATEGORY_ARTISTS, symphony.t.Artists))
+        add(category(MediaId.CATEGORY_PLAYLISTS, symphony.t.Playlists))
+        add(category(MediaId.CATEGORY_GENRES, symphony.t.Genres))
+        add(category(MediaId.CATEGORY_FOLDERS, symphony.t.Folders))
+    }
+
+    fun getChildren(parentMediaId: String): List<MediaItem> = when (parentMediaId) {
+        MediaId.ROOT -> rootChildren()
+        MediaId.CATEGORY_SONGS ->
+            allSongIdsSorted().take(MAX_CHILDREN).mapNotNull {
+                songItem(it, MediaId.CONTEXT_ALL, null)
+            }
+
+        MediaId.CATEGORY_ALBUMS -> albumIdsSorted().take(MAX_CHILDREN).mapNotNull { albumItem(it) }
+        MediaId.CATEGORY_ARTISTS -> artistNamesSorted().take(MAX_CHILDREN).map { artistItem(it) }
+        MediaId.CATEGORY_PLAYLISTS ->
+            playlistIdsSorted().mapNotNull { symphony.groove.playlist.get(it) }.map { playlistItem(it) }
+
+        MediaId.CATEGORY_GENRES -> genreNamesSorted().map { genreItem(it) }
+        MediaId.CATEGORY_FOLDERS -> folderChildren(symphony.groove.song.explorer)
+        else -> {
+            val parsed = MediaId.parse(parentMediaId) ?: return emptyList()
+            when (parsed.type) {
+                MediaId.TYPE_ALBUM ->
+                    albumSongIdsSorted(parsed.id).take(MAX_CHILDREN).mapNotNull {
+                        songItem(it, MediaId.TYPE_ALBUM, parsed.id)
+                    }
+
+                MediaId.TYPE_ARTIST ->
+                    artistSongIdsSorted(parsed.id).take(MAX_CHILDREN).mapNotNull {
+                        songItem(it, MediaId.TYPE_ARTIST, parsed.id)
+                    }
+
+                MediaId.TYPE_PLAYLIST ->
+                    (symphony.groove.playlist.get(parsed.id)?.getSortedSongIds(symphony) ?: emptyList())
+                        .take(MAX_CHILDREN)
+                        .mapNotNull { songItem(it, MediaId.TYPE_PLAYLIST, parsed.id) }
+
+                MediaId.TYPE_GENRE ->
+                    genreSongIdsSorted(parsed.id).take(MAX_CHILDREN).mapNotNull {
+                        songItem(it, MediaId.TYPE_GENRE, parsed.id)
+                    }
+
+                MediaId.TYPE_FOLDER ->
+                    resolveFolder(parsed.id)?.let { folderChildren(it) } ?: emptyList()
+
+                else -> emptyList()
+            }
+        }
+    }
+
+    // --- playback ---------------------------------------------------------------
+
+    fun playFromMediaId(mediaId: String) {
+        val parsed = MediaId.parse(mediaId) ?: return
+        when (parsed.type) {
+            MediaId.TYPE_SONG -> {
+                val queue = queueForContext(parsed.contextType, parsed.contextId)
+                val index = queue.indexOf(parsed.id).takeIf { it >= 0 } ?: 0
+                val finalQueue = queue.ifEmpty { listOf(parsed.id) }
+                symphony.radio.shorty.playQueue(finalQueue, Radio.PlayOptions(index = index))
+            }
+
+            MediaId.TYPE_ALBUM -> playSongs(albumSongIdsSorted(parsed.id))
+            MediaId.TYPE_ARTIST -> playSongs(artistSongIdsSorted(parsed.id))
+            MediaId.TYPE_PLAYLIST ->
+                playSongs(symphony.groove.playlist.get(parsed.id)?.getSortedSongIds(symphony) ?: emptyList())
+
+            MediaId.TYPE_GENRE -> playSongs(genreSongIdsSorted(parsed.id))
+            MediaId.TYPE_FOLDER -> playSongs(folderSongIds(parsed.id))
+            else -> {}
+        }
+    }
+
+    fun playFromSearch(query: String?) {
+        val q = query?.trim().orEmpty()
+        if (q.isEmpty()) {
+            // Generic "play music" voice command.
+            playSongs(allSongIdsSorted())
+            return
+        }
+        val ql = q.lowercase()
+        val songMatches = allSongIdsSorted().filter { id ->
+            symphony.groove.song.get(id)?.let { s ->
+                s.title.lowercase().contains(ql) || s.artists.any { it.lowercase().contains(ql) }
+            } == true
+        }
+        if (songMatches.isNotEmpty()) {
+            playSongs(songMatches)
+            return
+        }
+        albumIdsSorted().firstOrNull {
+            symphony.groove.album.get(it)?.name?.lowercase()?.contains(ql) == true
+        }?.let { playSongs(albumSongIdsSorted(it)); return }
+        artistNamesSorted().firstOrNull { it.lowercase().contains(ql) }
+            ?.let { playSongs(artistSongIdsSorted(it)); return }
+        playlistIdsSorted().mapNotNull { symphony.groove.playlist.get(it) }
+            .firstOrNull { it.title.lowercase().contains(ql) }
+            ?.let { playSongs(it.getSortedSongIds(symphony)) }
+    }
+
+    fun search(query: String?): List<MediaItem> {
+        val q = query?.trim()?.lowercase().orEmpty()
+        if (q.isEmpty()) return emptyList()
+        val items = mutableListOf<MediaItem>()
+        allSongIdsSorted().asSequence()
+            .mapNotNull { symphony.groove.song.get(it) }
+            .filter { s ->
+                s.title.lowercase().contains(q) ||
+                        s.artists.any { it.lowercase().contains(q) } ||
+                        (s.album?.lowercase()?.contains(q) == true)
+            }
+            .take(SEARCH_LIMIT)
+            .forEach { songItem(it.id, MediaId.CONTEXT_ALL, null)?.let(items::add) }
+        albumIdsSorted().asSequence()
+            .filter { symphony.groove.album.get(it)?.name?.lowercase()?.contains(q) == true }
+            .take(SEARCH_LIMIT)
+            .forEach { albumItem(it)?.let(items::add) }
+        artistNamesSorted().asSequence()
+            .filter { it.lowercase().contains(q) }
+            .take(SEARCH_LIMIT)
+            .forEach { items.add(artistItem(it)) }
+        playlistIdsSorted().asSequence()
+            .mapNotNull { symphony.groove.playlist.get(it) }
+            .filter { it.title.lowercase().contains(q) }
+            .take(SEARCH_LIMIT)
+            .forEach { items.add(playlistItem(it)) }
+        return items
+    }
+
+    private fun playSongs(songIds: List<String>) {
+        if (songIds.isEmpty()) return
+        symphony.radio.shorty.playQueue(songIds)
+    }
+
+    private fun queueForContext(contextType: String?, contextId: String?): List<String> =
+        when (contextType) {
+            MediaId.TYPE_ALBUM -> albumSongIdsSorted(contextId.orEmpty())
+            MediaId.TYPE_ARTIST -> artistSongIdsSorted(contextId.orEmpty())
+            MediaId.TYPE_PLAYLIST ->
+                symphony.groove.playlist.get(contextId.orEmpty())?.getSortedSongIds(symphony) ?: emptyList()
+
+            MediaId.TYPE_GENRE -> genreSongIdsSorted(contextId.orEmpty())
+            MediaId.TYPE_FOLDER -> folderSongIds(contextId.orEmpty())
+            else -> allSongIdsSorted()
+        }
+
+    // --- sorted id helpers (match the app's last-used sort options) -------------
+
+    private fun allSongIdsSorted() = symphony.groove.song.sort(
+        symphony.groove.song.ids(),
+        symphony.settings.lastUsedSongsSortBy.value,
+        symphony.settings.lastUsedSongsSortReverse.value,
+    )
+
+    private fun albumIdsSorted() = symphony.groove.album.sort(
+        symphony.groove.album.ids(),
+        symphony.settings.lastUsedAlbumsSortBy.value,
+        symphony.settings.lastUsedAlbumsSortReverse.value,
+    )
+
+    private fun artistNamesSorted() = symphony.groove.artist.sort(
+        symphony.groove.artist.ids(),
+        symphony.settings.lastUsedArtistsSortBy.value,
+        symphony.settings.lastUsedArtistsSortReverse.value,
+    )
+
+    private fun playlistIdsSorted() = symphony.groove.playlist.sort(
+        symphony.groove.playlist.ids(),
+        symphony.settings.lastUsedPlaylistsSortBy.value,
+        symphony.settings.lastUsedPlaylistsSortReverse.value,
+    )
+
+    private fun genreNamesSorted() = symphony.groove.genre.sort(
+        symphony.groove.genre.ids(),
+        symphony.settings.lastUsedGenresSortBy.value,
+        symphony.settings.lastUsedGenresSortReverse.value,
+    )
+
+    private fun albumSongIdsSorted(albumId: String) = symphony.groove.song.sort(
+        symphony.groove.album.getSongIds(albumId),
+        symphony.settings.lastUsedAlbumSongsSortBy.value,
+        symphony.settings.lastUsedAlbumSongsSortReverse.value,
+    )
+
+    private fun artistSongIdsSorted(artistName: String) = symphony.groove.song.sort(
+        symphony.groove.artist.getSongIds(artistName),
+        symphony.settings.lastUsedSongsSortBy.value,
+        symphony.settings.lastUsedSongsSortReverse.value,
+    )
+
+    private fun genreSongIdsSorted(genre: String) = symphony.groove.song.sort(
+        symphony.groove.genre.getSongIds(genre),
+        symphony.settings.lastUsedSongsSortBy.value,
+        symphony.settings.lastUsedSongsSortReverse.value,
+    )
+
+    // --- folders ----------------------------------------------------------------
+
+    private fun folderChildren(folder: SimpleFileSystem.Folder): List<MediaItem> {
+        val folderPath = folder.fullPath.pathString
+        return folder.children.values
+            .sortedWith(compareBy({ it !is SimpleFileSystem.Folder }, { it.name.lowercase() }))
+            .take(MAX_CHILDREN)
+            .mapNotNull { child ->
+                when (child) {
+                    is SimpleFileSystem.Folder -> folderItem(child)
+                    is SimpleFileSystem.File ->
+                        (child.data as? String)?.let { songItem(it, MediaId.TYPE_FOLDER, folderPath) }
+                }
+            }
+    }
+
+    private fun folderSongIds(folderPath: String): List<String> {
+        val folder = resolveFolder(folderPath) ?: return emptyList()
+        return folder.children.values
+            .filterIsInstance<SimpleFileSystem.File>()
+            .mapNotNull { it.data as? String }
+    }
+
+    private fun resolveFolder(folderPath: String): SimpleFileSystem.Folder? {
+        var current = symphony.groove.song.explorer
+        val parts = SimplePath(folderPath).parts
+        var index = 0
+        if (parts.isNotEmpty() && parts[0] == current.name) {
+            index = 1
+        }
+        while (index < parts.size) {
+            current = current.children[parts[index]] as? SimpleFileSystem.Folder ?: return null
+            index++
+        }
+        return current
+    }
+
+    // --- media items ------------------------------------------------------------
+
+    private fun category(mediaId: String, title: String): MediaItem {
+        val description = MediaDescriptionCompat.Builder()
+            .setMediaId(mediaId)
+            .setTitle(title)
+            .build()
+        return MediaItem(description, MediaItem.FLAG_BROWSABLE)
+    }
+
+    private fun songItem(songId: String, contextType: String?, contextId: String?): MediaItem? {
+        val song = symphony.groove.song.get(songId) ?: return null
+        val description = MediaDescriptionCompat.Builder()
+            .setMediaId(MediaId.of(MediaId.TYPE_SONG, songId, contextType, contextId))
+            .setTitle(song.title)
+            .setSubtitle(song.artists.joinToString().ifEmpty { null })
+            .apply { coversUri(song.coverFile)?.let { setIconUri(it) } }
+            .build()
+        return MediaItem(description, MediaItem.FLAG_PLAYABLE)
+    }
+
+    private fun albumItem(albumId: String): MediaItem? {
+        val album = symphony.groove.album.get(albumId) ?: return null
+        val firstCover = symphony.groove.album.getSongIds(albumId).firstOrNull()
+            ?.let { symphony.groove.song.get(it)?.coverFile }
+        val description = MediaDescriptionCompat.Builder()
+            .setMediaId(MediaId.of(MediaId.TYPE_ALBUM, albumId))
+            .setTitle(album.name)
+            .setSubtitle(album.artists.joinToString().ifEmpty { null })
+            .apply { coversUri(firstCover)?.let { setIconUri(it) } }
+            .build()
+        return MediaItem(description, MediaItem.FLAG_BROWSABLE)
+    }
+
+    private fun artistItem(artistName: String): MediaItem {
+        val firstCover = symphony.groove.artist.getSongIds(artistName).firstOrNull()
+            ?.let { symphony.groove.song.get(it)?.coverFile }
+        val description = MediaDescriptionCompat.Builder()
+            .setMediaId(MediaId.of(MediaId.TYPE_ARTIST, artistName))
+            .setTitle(artistName)
+            .apply { coversUri(firstCover)?.let { setIconUri(it) } }
+            .build()
+        return MediaItem(description, MediaItem.FLAG_BROWSABLE)
+    }
+
+    private fun playlistItem(playlist: Playlist): MediaItem {
+        val description = MediaDescriptionCompat.Builder()
+            .setMediaId(MediaId.of(MediaId.TYPE_PLAYLIST, playlist.id))
+            .setTitle(playlist.title)
+            .apply { playlistIconUri(playlist)?.let { setIconUri(it) } }
+            .build()
+        return MediaItem(description, MediaItem.FLAG_BROWSABLE)
+    }
+
+    private fun genreItem(genre: String): MediaItem {
+        val description = MediaDescriptionCompat.Builder()
+            .setMediaId(MediaId.of(MediaId.TYPE_GENRE, genre))
+            .setTitle(genre)
+            .build()
+        return MediaItem(description, MediaItem.FLAG_BROWSABLE)
+    }
+
+    private fun folderItem(folder: SimpleFileSystem.Folder): MediaItem {
+        val description = MediaDescriptionCompat.Builder()
+            .setMediaId(MediaId.of(MediaId.TYPE_FOLDER, folder.fullPath.pathString))
+            .setTitle(folder.name)
+            .build()
+        return MediaItem(description, MediaItem.FLAG_BROWSABLE)
+    }
+
+    // --- artwork uris -----------------------------------------------------------
+
+    private fun coversUri(coverFile: String?): Uri? =
+        coverFile?.let { ArtworkProvider.coversUri(context, it) }
+
+    private fun playlistIconUri(playlist: Playlist): Uri? {
+        playlist.customCoverPath?.let {
+            return ArtworkProvider.playlistCoverUri(context, it)
+        }
+        val firstCover = playlist.getSongIds(symphony).firstOrNull()
+            ?.let { symphony.groove.song.get(it)?.coverFile }
+        return coversUri(firstCover)
+    }
+
+    companion object {
+        private const val MAX_CHILDREN = 500
+        private const val SEARCH_LIMIT = 20
+    }
+}

@@ -30,7 +30,9 @@ class MainActivity : ComponentActivity() {
             finish()
         }
 
-        val symphony: Symphony by viewModels()
+        // MAZIKA: obtain the single process-scoped Symphony so the phone UI and the
+        // Android Auto media browser service share one playback source of truth.
+        val symphony = SymphonyProvider.get(application)
         symphony.permission.handle(this)
         gSymphony = symphony
         symphony.emitActivityReady()

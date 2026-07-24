@@ -39,5 +39,30 @@
             android:name=".services.radio.RadioNotificationService"
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="true" />
+
+        <!-- MAZIKA: Android Auto media browser service. Shares the app's
+             MediaSessionCompat and playback engine. Exported so the Android Auto
+             host can bind it. -->
+        <service
+            android:name=".services.radio.RadioBrowserService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- MAZIKA: read-only artwork/cover provider for the Android Auto host.
+             Not exported; per-uri read permission is granted to the browser
+             client by RadioBrowserService. -->
+        <provider
+            android:name=".services.radio.ArtworkProvider"
+            android:authorities="${applicationId}.artwork"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <!-- MAZIKA: declares Android Auto media support. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:value="@xml/automotive_app_desc" />
     </application>
 </manifest>
