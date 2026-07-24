@@ -1,65 +1,128 @@
-<p align="center">
-    <img src="./media/banner.png" width="100%">
-</p>
+<h1 align="center">MAZIKA</h1>
 
-<p align="center">
-    <a href="https://github.com/zyrouge"><img src="https://img.shields.io/badge/made%20by-zyrouge-d946ef"></a>
-    <a href="#links"><img src="https://img.shields.io/badge/❤️%20consider%20donating-ffffff"></a>
-</p>
+<p align="center">🎵 A lightweight, offline, local music player for Android.</p>
 
-<h1 align="center">Symphony</h1>
+<p align="center"><b>MAZIKA is a customised Android-only fork of <a href="https://github.com/zyrouge/symphony">Symphony</a> by Zyrouge, distributed under the AGPL-3.0 license.</b></p>
 
-<p align="center">🎵 Lightweight, elegant music player that enhances your offline music experience. Supports Android 9 and later.</p>
+---
 
-<p align="center">
-    <a href="https://github.com/zyrouge/symphony/releases/latest">Download (latest)</a> |
-    <a href="https://github.com/zyrouge/symphony/releases">View all releases</a> |
-    <a href="https://apt.izzysoft.de/fdroid/index/apk/io.github.zyrouge.symphony">IzzyOnDroid</a> |
-    <a href="https://f-droid.org/en/packages/io.github.zyrouge.symphony/">F-Droid</a> |
-    <a href="https://play.google.com/store/apps/details?id=io.github.zyrouge.symphony">Play Store</a>
-</p>
+## About
 
-<p align="center">
-    <a href=""><img src="https://img.shields.io/badge/stage-partially%20stable-545DFF"></a>
-    <a href="https://github.com/zyrouge/symphony/releases/latest"><img src="https://img.shields.io/github/v/release/zyrouge/symphony?label=latest"></a>
-    <a href="https://github.com/zyrouge/symphony/tags"><img src="https://img.shields.io/github/v/tag/zyrouge/symphony?label=latest-nightly&color=c9833c"></a>
-    <a href=""><img src="https://img.shields.io/badge/supports-Android%209+-AD2A5A"></a>
-    <a href="https://github.com/zyrouge/symphony/tree/i18n-summary"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/zyrouge/symphony/i18n-summary/badge-translated.json"></a>
-    <a href="https://github.com/zyrouge/symphony/tree/i18n-summary"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/zyrouge/symphony/i18n-summary/badge-languages.json"></a>
-    <a href="https://github.com/zyrouge/symphony/tree/i18n-summary"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/zyrouge/symphony/i18n-summary/badge-strings.json"></a>
-    <a href="https://github.com/zyrouge/symphony/releases"><img src="https://img.shields.io/github/downloads/zyrouge/symphony/total?color=E08312"></a>
-    <a href="https://github.com/zyrouge/symphony/releases/latest"><img src="https://img.shields.io/github/downloads/zyrouge/symphony/latest/total?color=E08312"></a>
-    <a href="https://github.com/zyrouge/symphony/actions/workflows/stable.yml"><img src="https://github.com/zyrouge/symphony/actions/workflows/stable.yml/badge.svg"></a>
-    <a href="https://github.com/zyrouge/symphony/actions/workflows/code-analysis.yml"><img src="https://github.com/zyrouge/symphony/actions/workflows/code-analysis.yml/badge.svg"></a>
-    <a href="./LICENSE"><img src="https://img.shields.io/github/license/zyrouge/symphony"></a>
-</p>
+MAZIKA is an offline, local music player built on top of the open-source
+[Symphony](https://github.com/zyrouge/symphony) project. It keeps Symphony's fast,
+elegant, Jetpack Compose experience and adds a small set of Android-focused
+features while remaining fully offline-first (no analytics, no accounts, no
+streaming).
 
-<br>
+It installs with its own application id (`com.mazika.musicplayer`) so it can live
+side by side with the original Symphony app.
 
-<p align="center">
-    <img src="./media/screenshots.png" width="100%">
-</p>
+### Attribution & license
 
-## Why?
+MAZIKA is a **modified fork** of Symphony. It is **not** an official Symphony
+release and is not affiliated with or endorsed by the Symphony authors. The
+original project, its copyright notices and third-party library licenses are
+preserved. Upstream attribution (author, source repository) remains available in
+the app's **Settings → About** section and in the [`LICENSE`](./LICENSE) file.
 
-Why was this created? As I was getting into offline music, most of the popular good-looking music players did not support filename/path based sorting, which is what I really needed to keep my music organized. So I must have forked them and added it right? I could have done that but, I felt like trying out Kotlin and Compose, so I ended up making my own.
+Licensed under [AGPL-3.0](./LICENSE), the same license as upstream Symphony.
 
-## Links
+## MAZIKA features (on top of Symphony)
 
--   [Wiki](https://github.com/zyrouge/symphony/wiki)
--   [Discord](https://discord.gg/5k9Hdq7ycm)
--   [Reddit](https://reddit.com/r/symphony_app)
--   [Github Sponsors](https://github.com/sponsors/zyrouge)
--   [Patreon](https://patreon.com/zyrouge)
+1. **MAZIKA rebranding** — name, launcher icon and application id, installable
+   alongside Symphony.
+2. **Android Auto** — browse Songs / Albums / Artists / Playlists / Genres /
+   Folders and play them in the car, backed by the same playback engine and
+   session as the phone. Voice/media search is supported. (No CarPlay / iOS.)
+3. **Swipe down on the Now Playing cover to open lyrics** — a shortcut to the
+   existing lyrics view; the lyrics button remains as well.
+4. **Configurable pause/resume fade** — a dependent "Fade on pause and resume"
+   option nested under "Fade playback" (Settings → Player).
+5. **Custom playlist covers** — pick, preview, replace and remove a square custom
+   image for any playlist; it appears everywhere including Android Auto.
 
-## Contributing
+All existing Symphony functionality is preserved.
 
-Before contributing, please read the [Developer Guide](https://github.com/zyrouge/symphony/wiki/Developer-Guide).
+## Requirements
 
-Any kind of contribution including creating issues or making pull requests is welcomed. Make sure to keep it pointful. Donations through [GitHub Sponsors](https://github.com/sponsors/zyrouge) or [Patreon](https://patreon.com/zyrouge) helps me to stay motivated to keep working on this project.
+- **Android 9 (API 28) or later** (unchanged from Symphony).
+- Build toolchain: JDK 17, Node.js 18+, Android SDK 35 (build-tools 35.0.0),
+  Android NDK `27.0.12077973`, CMake `3.22.1`. The Gradle wrapper (8.10.2) fetches
+  Gradle itself.
 
-[![](https://contrib.rocks/image?repo=zyrouge/symphony)](https://github.com/zyrouge/symphony/graphs/contributors)
+## Building
+
+MAZIKA has a native module (`metaphony`, a TagLib wrapper) so the NDK/CMake and the
+TagLib git submodule are required.
+
+```bash
+# 1. Fetch the native submodule (TagLib)
+git submodule update --init --recursive
+
+# 2. Install the Node tooling (used for the translation/i18n generation)
+npm install
+
+# 3. Generate translation resources (REQUIRED before every build — the generated
+#    files under app/src/main/assets/i18n and *.g.kt are git-ignored)
+npm run prebuild
+
+# 4a. Debug build (Windows)
+gradlew.bat assembleDebug
+# 4b. Debug build (Linux/macOS)
+./gradlew assembleDebug
+```
+
+Point Gradle at your SDK via `local.properties` (use forward slashes on Windows):
+
+```
+sdk.dir=C:/Users/<you>/Android/Sdk
+```
+
+APKs are written to `app/build/outputs/apk/debug/` (ABI splits plus a
+`app-universal-debug.apk`). A ready-to-install copy is provided at
+[`artifacts/MAZIKA-debug.apk`](./artifacts/).
+
+### Release build
+
+```bash
+gradlew.bat assembleRelease
+```
+
+Release builds are minified (R8) and signed with a keystore supplied via
+environment variables. See [`SIGNING.md`](./SIGNING.md) for how to generate and use
+a permanent MAZIKA release keystore. Without a keystore an unsigned release APK is
+produced (install the debug APK for testing).
+
+## Android Auto testing
+
+Android Auto cannot be verified from a headless build. To test on real hardware:
+
+1. Install `MAZIKA-debug.apk` on a phone and grant the music-library permission.
+2. Enable **Developer settings** in the Android Auto app and turn on **Unknown
+   sources** so the debug build is visible.
+3. Connect to the **Desktop Head Unit (DHU)** or a real Android Auto head unit and
+   open MAZIKA from the media apps list.
+4. Alternatively, use the **Media Controller Test** app to exercise the
+   `MediaBrowserService` browse tree and transport controls without a car.
+
+## Playlist cover storage
+
+Selected covers are processed (EXIF-oriented, centre-cropped to a square, scaled to
+at most 1024×1024) and stored as WebP inside the app's private internal storage at
+`files/playlist_covers/`. The playlist stores only a relative file name. Replacing a
+cover writes a new file and deletes the old one; removing a cover or deleting a
+playlist deletes the file; orphaned files are cleaned up on library refresh. The
+user's original gallery image is never modified or deleted.
+
+## Documentation
+
+- [`CHANGELOG.md`](./CHANGELOG.md) — what changed in MAZIKA.
+- [`IMPLEMENTATION_REPORT.md`](./IMPLEMENTATION_REPORT.md) — architecture, files
+  changed, migrations, tests, APKs, limitations.
+- [`TESTING.md`](./TESTING.md) — manual test cases.
+- [`SIGNING.md`](./SIGNING.md) — release signing.
 
 ## License
 
-[AGPL-3.0](./LICENSE)
+[AGPL-3.0](./LICENSE) — inherited from Symphony. Based on
+[zyrouge/symphony](https://github.com/zyrouge/symphony).
