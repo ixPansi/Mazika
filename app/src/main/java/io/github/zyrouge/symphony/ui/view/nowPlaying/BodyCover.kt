@@ -35,7 +35,10 @@ import io.github.zyrouge.symphony.ui.helpers.FadeTransition
 import io.github.zyrouge.symphony.ui.helpers.ScreenOrientation
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.AlbumViewRoute
+import io.github.zyrouge.symphony.ui.view.LyricsViewRoute
 import io.github.zyrouge.symphony.ui.view.NowPlayingData
+import io.github.zyrouge.symphony.ui.view.NowPlayingDefaults
+import io.github.zyrouge.symphony.ui.view.NowPlayingLyricsLayout
 import io.github.zyrouge.symphony.ui.view.NowPlayingStates
 
 @Composable
@@ -61,7 +64,24 @@ fun NowPlayingBodyCover(
             if (targetStateShowLyrics) {
                 NowPlayingBodyCoverLyrics(context, orientation)
             } else {
-                NowPlayingBodyCoverArtwork(context, data.song)
+                NowPlayingBodyCoverArtwork(
+                    context,
+                    data.song,
+                    // MAZIKA: swiping the large cover downward opens lyrics using
+                    // the same behaviour as the lyrics button in the bottom bar.
+                    onOpenLyrics = {
+                        when (data.lyricsLayout) {
+                            NowPlayingLyricsLayout.ReplaceArtwork -> {
+                                states.showLyrics.value = true
+                                NowPlayingDefaults.showLyrics = true
+                            }
+
+                            NowPlayingLyricsLayout.SeparatePage -> {
+                                context.navController.navigate(LyricsViewRoute)
+                            }
+                        }
+                    },
+                )
             }
         }
     }
@@ -103,7 +123,11 @@ private fun NowPlayingBodyCoverLyrics(context: ViewContext, orientation: ScreenO
 }
 
 @Composable
-private fun NowPlayingBodyCoverArtwork(context: ViewContext, song: Song) {
+private fun NowPlayingBodyCoverArtwork(
+    context: ViewContext,
+    song: Song,
+    onOpenLyrics: () -> Unit,
+) {
     BoxWithConstraints {
         val dimension = min(this@BoxWithConstraints.maxHeight, this@BoxWithConstraints.maxWidth)
 
@@ -138,6 +162,11 @@ private fun NowPlayingBodyCoverArtwork(context: ViewContext, song: Song) {
                                 context.symphony.radio.jumpToPrevious()
                             }
                         },
+                        // MAZIKA: deliberate downward swipe opens lyrics. The
+                        // swipeable modifier only fires this once per gesture and
+                        // only when the vertical drag dominates the horizontal one,
+                        // so it will not conflict with the left/right track swipes.
+                        onSwipeDown = onOpenLyrics,
                     )
                     .pointerInput(Unit) {
                         detectTapGestures { _ ->
