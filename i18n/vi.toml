@@ -4,13 +4,13 @@ locale = "vi"
 UnknownSymbol = "?"
 HelloThere = "Chào đằng ấy!"
 IntroductoryMessage = """
-Cảm ơn bạn vì đã tham gia open beta của Symphony. Nếu bạn gặp bất kỳ bug nào hoặc muốn đề xuất cải tiến, vui lòng mở issue trong Repo Github của chúng tôi.
+Cảm ơn bạn vì đã tham gia open beta của MAZIKA. Nếu bạn gặp bất kỳ bug nào hoặc muốn đề xuất cải tiến, vui lòng mở issue trong Repo Github của chúng tôi.
 
 Tham gia cộng đồng Discord và Reddit của chúng tôi để chia sẻ phản hồi của bạn và để nhận được thông tin mới nhất về ứng dụng.
 
-Symphony hoàn toàn miễn phí và được hỗ trợ hoàn toàn bởi sự đóng góp của những người tốt bụng. Mọi sự đóng góp đều sẽ được ghi nhận.
+MAZIKA hoàn toàn miễn phí và được hỗ trợ hoàn toàn bởi sự đóng góp của những người tốt bụng. Mọi sự đóng góp đều sẽ được ghi nhận.
 
-Một lần nữa, cảm ơn bạn vì đã dùng thử Symphony!
+Một lần nữa, cảm ơn bạn vì đã dùng thử MAZIKA!
 """
 Songs = "Bài hát"
 Artists = "Nghệ sĩ"
@@ -51,7 +51,7 @@ AlbumCount = "Số lượng album"
 TrackCount = "Số lượng bài hát"
 FilteringResults = "Đang lọc kết quả..."
 Appearance = "Hiển thị"
-About = "Về Symphony"
+About = "Về MAZIKA"
 Github = "Github"
 Play = "Phát"
 Previous = "Bài hát trước"

@@ -10,7 +10,11 @@ import org.json.JSONObject
 
 @Suppress("ConstPropertyName")
 object AppMeta {
-    const val appName = "Symphony"
+    const val appName = "MAZIKA"
+
+    // MAZIKA is an Android-only customised fork of Symphony by Zyrouge.
+    // The following attribution links intentionally point at the upstream
+    // Symphony project, which MAZIKA is based on and derives from.
     const val author = "Zyrouge"
     const val githubRepositoryOwner = "zyrouge"
     const val githubRepositoryName = "symphony"

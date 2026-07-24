@@ -4,13 +4,13 @@ locale = "ro"
 UnknownSymbol = "?"
 HelloThere = "Salut!"
 IntroductoryMessage = """
-Mulțumim că faci parte din open-beta-ul aplicației Symphony. Dacă întâmpini bug-uri sau vrei să sugerezi îmbunătățiri, te rugăm să deschizi un issue pe Github.
+Mulțumim că faci parte din open-beta-ul aplicației MAZIKA. Dacă întâmpini bug-uri sau vrei să sugerezi îmbunătățiri, te rugăm să deschizi un issue pe Github.
 
 Alătură-te comunității noastre de Discord și Reddit pentru a-ți împărtăși ideile și pentru a fi la curent cu dezvoltarea aplicației.
 
-Aplicația Symphony este gratuită, fiind susținută în întregime prin donați făcute prin Github Sponsors, Ko-fi și Patreon.
+Aplicația MAZIKA este gratuită, fiind susținută în întregime prin donați făcute prin Github Sponsors, Ko-fi și Patreon.
 
-Din nou, mulțumim pentru că ai încercat Symphony!
+Din nou, mulțumim pentru că ai încercat MAZIKA!
 """
 Songs = "Piese"
 Artists = "Artiști"

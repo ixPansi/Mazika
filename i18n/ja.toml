@@ -4,13 +4,13 @@ locale = "ja"
 UnknownSymbol = "？"
 HelloThere = "こんにちは！"
 IntroductoryMessage = """
-Symphonyオープンベータをご利用いただきありがとうございます。バグが発生した場合、または改善を提案したい場合は、Githubリポジトリでissueを開いてください。
+MAZIKAオープンベータをご利用いただきありがとうございます。バグが発生した場合、または改善を提案したい場合は、Githubリポジトリでissueを開いてください。
 
 DiscordおよびRedditコミュニティに参加してフィードバックを共有し、最新情報を入手してください。
 
-Symphonyは、Github Sponsors、Ko-fi、Patreon経由での寄付によってサポートされています。
+MAZIKAは、Github Sponsors、Ko-fi、Patreon経由での寄付によってサポートされています。
 
-改めて、Symphonyをお試しいただきありがとうございます。
+改めて、MAZIKAをお試しいただきありがとうございます。
 """
 Songs = "曲"
 Artists = "アーティスト"
@@ -51,7 +51,7 @@ AlbumCount = "アルバム数"
 TrackCount = "トラック数"
 FilteringResults = "結果をフィルタリング中..."
 Appearance = "外観"
-About = "symphonyについて"
+About = "MAZIKAについて"
 Github = "Github"
 Play = "再生"
 Previous = "前の曲"

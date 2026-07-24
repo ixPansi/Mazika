@@ -4,13 +4,13 @@ locale = "fi"
 UnknownSymbol = "?"
 HelloThere = "Hei siellä!"
 IntroductoryMessage = """
-Kiitos osallistumisestasi Symphonyn avoimeen betaan. Jos kohtaat virheitä tai haluat antaa parannusehdotuksia, avaa kysymys GitHub-repositoriossamme.
+Kiitos osallistumisestasi MAZIKAn avoimeen betaan. Jos kohtaat virheitä tai haluat antaa parannusehdotuksia, avaa kysymys GitHub-repositoriossamme.
 
 Liity Discord- ja Reddit-yhteisöihimme antaaksesi palautetta ja pysyäksesi ajan tasalla kehityksestä.
 
-Symphony on täysin ilmainen sovellus, jota ylläpidetään vapaaehtoisvoimin. Osallistuminen on erittäin tervetullutta.
+MAZIKA on täysin ilmainen sovellus, jota ylläpidetään vapaaehtoisvoimin. Osallistuminen on erittäin tervetullutta.
 
-Kiitos, kun käytät Symphonyä!
+Kiitos, kun käytät MAZIKAä!
 """
 Songs = "Kappaleet"
 Artists = "Artistit"

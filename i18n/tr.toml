@@ -4,8 +4,8 @@ locale = "tr"
 UnknownSymbol = "?"
 HelloThere = "Merhaba!"
 IntroductoryMessage = """
-Symphony'yi seçtiğiniz için teşekkürler! Herhangi bir teknik sorunla karşılaşırsanız, Github Repo'muza bildirebilirsiniz.
-Diğer müzik severlerle bağlantı kurmak, destek almak ve en son güncellemelerden haberdar olmak için Discord ve Reddit topluluğumuza katılın. Cömertliğiniz, Symphony'nin gelişiminin devam etmesine yardımcı oluyor, bu nedenle lütfen Github Sponsors üzerinden bağış yaparak bizi desteklemeyi düşünün.
+MAZIKA'yi seçtiğiniz için teşekkürler! Herhangi bir teknik sorunla karşılaşırsanız, Github Repo'muza bildirebilirsiniz.
+Diğer müzik severlerle bağlantı kurmak, destek almak ve en son güncellemelerden haberdar olmak için Discord ve Reddit topluluğumuza katılın. Cömertliğiniz, MAZIKA'nin gelişiminin devam etmesine yardımcı oluyor, bu nedenle lütfen Github Sponsors üzerinden bağış yaparak bizi desteklemeyi düşünün.
 Son olarak, Müziğin keyfini Çıkarın!
 """
 Songs = "Müzikler"

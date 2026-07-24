@@ -12,7 +12,10 @@ android {
     compileSdk = libs.versions.compile.sdk.get().toInt()
 
     defaultConfig {
-        applicationId = "io.github.zyrouge.symphony"
+        // MAZIKA uses its own application id so it can be installed side by side
+        // with the upstream Symphony app. The Kotlin namespace intentionally stays
+        // io.github.zyrouge.symphony to avoid a large, risky package refactor.
+        applicationId = "com.mazika.musicplayer"
         minSdk = libs.versions.min.sdk.get().toInt()
         targetSdk = libs.versions.target.sdk.get().toInt()
 

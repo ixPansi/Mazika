@@ -4,13 +4,13 @@ locale = "pl"
 UnknownSymbol = "?"
 HelloThere = "Witaj!"
 IntroductoryMessage = """
-Dziękujemy za udział w otwartej wersji beta Symphony. Jeśli napotkasz jakieś błędy lub chcesz zasugerować ulepszenia, otwórz zgłoszenie w naszym repozytorium Github.
+Dziękujemy za udział w otwartej wersji beta MAZIKA. Jeśli napotkasz jakieś błędy lub chcesz zasugerować ulepszenia, otwórz zgłoszenie w naszym repozytorium Github.
 
 Dołącz do naszej społeczności Discord i Reddit, aby podzielić się swoimi opiniami i być na bieżąco.
 
-Symphony jest całkowicie darmowa i w całości wspierana przez życzliwe osoby. Każdy wkład będzie bardzo mile widziany.
+MAZIKA jest całkowicie darmowa i w całości wspierana przez życzliwe osoby. Każdy wkład będzie bardzo mile widziany.
 
-Jeszcze raz dziękujemy za wypróbowanie Symphony!
+Jeszcze raz dziękujemy za wypróbowanie MAZIKA!
 """
 Songs = "Utwory"
 Artists = "Wykonawcy"

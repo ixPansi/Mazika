@@ -4,13 +4,13 @@ locale = "ryu"
 UnknownSymbol = "？"
 HelloThere = "はいさい！"
 IntroductoryMessage = """
-Symphonyオープンベータぐりよういただきにふぇーでーびる。バグぬはっせいさーあい、あらんでぃかいじんていあんさるいばあえー、Githubリポジトリっしissueふぃらちくぃみそーれー。
+MAZIKAオープンベータぐりよういただきにふぇーでーびる。バグぬはっせいさーあい、あらんでぃかいじんていあんさるいばあえー、Githubリポジトリっしissueふぃらちくぃみそーれー。
 
 DiscordうゆびRedditコミュニティなさんがしフィードバックちゅーゆーいんし、さいしんじょうほうをんかいゅうしゅしください。
 
-Symphonyー、Github Sponsors、Ko-fi、Patreonけいゆでいどぅちふにゆってぃサポートさりとーいびーん。
+MAZIKAー、Github Sponsors、Ko-fi、Patreonけいゆでいどぅちふにゆってぃサポートさりとーいびーん。
 
-あらたみてぃ、Symphonyうたみしいただきにふぇーでーびる。
+あらたみてぃ、MAZIKAうたみしいただきにふぇーでーびる。
 """
 Songs = "きょく"
 Artists = "アーティスト"
@@ -51,7 +51,7 @@ AlbumCount = "アルバムすーいん"
 TrackCount = "トラックすーいん"
 FilteringResults = "きっかフィルタリングちゅう..."
 Appearance = "やしがいかん"
-About = "symphonyにちいてぃ"
+About = "MAZIKAにちいてぃ"
 Github = "Github"
 Play = "さいせい"
 Previous = "めーぬきょく"
