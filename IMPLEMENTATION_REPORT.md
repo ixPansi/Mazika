@@ -177,6 +177,24 @@ Lint: `lintDebug` passes with **0 errors** (73 warnings, of which ~69 are
 pre-existing "newer dependency version available" advisories inherited from upstream;
 none are new code issues).
 
+## Security note: inherited upstream secrets
+
+The upstream fork point (`dd04b87`) tracks `secrets/signing_key.jks` — an
+**unencrypted PKCS#12 keystore** — together with `secrets/secrets.txt` containing
+its **plaintext passwords**, despite `.gitignore` already listing `secrets`. These
+belong to the upstream Symphony project.
+
+MAZIKA does not use them: release signing reads a keystore supplied through
+environment variables (`SIGNING.md`), and the release build falls back to an
+unsigned APK when none is present. They have been **removed from the `mazika-main`
+branch** (commit `chore: remove inherited upstream signing secrets`) so this fork
+does not redistribute another project's private signing key.
+
+They do still exist inside the inherited upstream commit object; purging them from
+there would require rewriting the upstream history this fork is based on, which
+would break the recorded fork point. No secrets were introduced by this work, and
+no keystore or password is committed on the MAZIKA branch.
+
 ## Remaining limitations
 - **Android Auto / car**: not verified on a physical car, the Desktop Head Unit or
   Media Controller Test in this environment (headless build machine, no phone/car
