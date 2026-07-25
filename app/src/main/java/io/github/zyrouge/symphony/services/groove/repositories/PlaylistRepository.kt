@@ -209,9 +209,14 @@ class PlaylistRepository(private val symphony: Symphony) {
     // heavy decode/resize/write runs off the main thread; onResult is delivered on
     // the main thread. The previous cover file is deleted only after the new one is
     // saved and persisted (atomic replacement).
-    fun setCustomCover(playlist: Playlist, sourceUri: android.net.Uri, onResult: (Boolean) -> Unit) {
+    fun setCustomCover(
+        playlist: Playlist,
+        sourceUri: android.net.Uri,
+        crop: PlaylistCovers.CropRegion? = null,
+        onResult: (Boolean) -> Unit,
+    ) {
         symphony.groove.coroutineScope.launch {
-            val name = PlaylistCovers.saveFromUri(symphony, playlist.id, sourceUri)
+            val name = PlaylistCovers.saveFromUri(symphony, playlist.id, sourceUri, crop)
             if (name == null) {
                 withContext(Dispatchers.Main) { onResult(false) }
                 return@launch

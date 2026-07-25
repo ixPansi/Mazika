@@ -40,7 +40,9 @@ import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.theme.PrimaryThemeColor
 import io.github.zyrouge.symphony.ui.theme.SymphonyTypography
 import io.github.zyrouge.symphony.ui.theme.ThemeColors
+import io.github.zyrouge.symphony.ui.theme.ThemeIcons
 import io.github.zyrouge.symphony.ui.theme.ThemeMode
+import io.github.zyrouge.symphony.ui.theme.ThemePreset
 import kotlinx.serialization.Serializable
 
 private val scalingPresets = listOf(
@@ -61,6 +63,7 @@ fun AppearanceSettingsView(context: ViewContext) {
     val themeMode by context.symphony.settings.themeMode.flow.collectAsState()
     val useMaterialYou by context.symphony.settings.useMaterialYou.flow.collectAsState()
     val primaryColor by context.symphony.settings.primaryColor.flow.collectAsState()
+    val themePreset by context.symphony.settings.themePreset.flow.collectAsState()
     val fontScale by context.symphony.settings.fontScale.flow.collectAsState()
     val contentScale by context.symphony.settings.contentScale.flow.collectAsState()
 
@@ -182,6 +185,36 @@ fun AppearanceSettingsView(context: ViewContext) {
                         }
                     )
                     HorizontalDivider()
+                    // MAZIKA: one-tap named themes. Selecting a preset applies its
+                    // mode and colour together, turns Material You off so the
+                    // preset's colour is what actually shows, and swaps the launcher
+                    // icon to match.
+                    SettingsOptionTile(
+                        icon = {
+                            Icon(Icons.Filled.Palette, null)
+                        },
+                        title = {
+                            Text(context.symphony.t.ThemePreset)
+                        },
+                        value = themePreset,
+                        values = buildMap {
+                            ThemePreset.selectable.forEach { put(it, it.label(context)) }
+                            if (themePreset == ThemePreset.Custom) {
+                                put(ThemePreset.Custom, context.symphony.t.Custom)
+                            }
+                        },
+                        onChange = { value ->
+                            if (value == ThemePreset.Custom) {
+                                return@SettingsOptionTile
+                            }
+                            context.symphony.settings.themePreset.setValue(value)
+                            context.symphony.settings.themeMode.setValue(value.themeMode)
+                            context.symphony.settings.primaryColor.setValue(value.primaryColor.name)
+                            context.symphony.settings.useMaterialYou.setValue(false)
+                            ThemeIcons.apply(context.symphony.applicationContext, value)
+                        }
+                    )
+                    HorizontalDivider()
                     SettingsOptionTile(
                         icon = {
                             Icon(Icons.Filled.Palette, null)
@@ -199,6 +232,7 @@ fun AppearanceSettingsView(context: ViewContext) {
                         ),
                         onChange = { value ->
                             context.symphony.settings.themeMode.setValue(value)
+                            syncPresetToSelection(context, value, primaryColor)
                         }
                     )
                     HorizontalDivider()
@@ -227,6 +261,7 @@ fun AppearanceSettingsView(context: ViewContext) {
                         enabled = !useMaterialYou,
                         onChange = { value ->
                             context.symphony.settings.primaryColor.setValue(value.name)
+                            syncPresetToSelection(context, themeMode, value.name)
                         }
                     )
                 }
@@ -235,7 +270,40 @@ fun AppearanceSettingsView(context: ViewContext) {
     )
 }
 
+/**
+ * MAZIKA: keeps the preset in step with hand-picked mode/colour values. If the pair
+ * matches a named preset we select it (and its launcher icon); otherwise the user is
+ * on a custom combination.
+ */
+private fun syncPresetToSelection(
+    context: ViewContext,
+    themeMode: ThemeMode,
+    primaryColorName: String?,
+) {
+    val preset = ThemePreset.match(
+        themeMode,
+        ThemeColors.resolvePrimaryColorKey(primaryColorName),
+    )
+    context.symphony.settings.themePreset.setValue(preset)
+    if (preset != ThemePreset.Custom) {
+        ThemeIcons.apply(context.symphony.applicationContext, preset)
+    }
+}
+
+// Preset and brand-colour names are product names, so they stay untranslated —
+// only "Custom" comes from the translations.
+fun ThemePreset.label(context: ViewContext) = when (this) {
+    ThemePreset.MazikaRed -> "MAZIKA Red"
+    ThemePreset.Midnight -> "Midnight"
+    ThemePreset.Forest -> "Forest"
+    ThemePreset.Ocean -> "Ocean"
+    ThemePreset.Sunset -> "Sunset"
+    ThemePreset.Daylight -> "Daylight"
+    ThemePreset.Custom -> context.symphony.t.Custom
+}
+
 fun PrimaryThemeColor.label(context: ViewContext) = when (this) {
+    PrimaryThemeColor.MazikaRed -> "MAZIKA Red"
     PrimaryThemeColor.Red -> context.symphony.t.Red
     PrimaryThemeColor.Orange -> context.symphony.t.Orange
     PrimaryThemeColor.Amber -> context.symphony.t.Amber

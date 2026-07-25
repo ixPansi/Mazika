@@ -592,6 +592,15 @@ name = "RenamePlaylist"
 name = "ChangePlaylistCover"
 
 [[keys]]
+name = "CropCoverHint"
+
+[[keys]]
+name = "Center"
+
+[[keys]]
+name = "ThemePreset"
+
+[[keys]]
 name = "RemoveCustomCover"
 
 [[keys]]

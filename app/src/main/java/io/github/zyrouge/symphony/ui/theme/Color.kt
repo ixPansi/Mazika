@@ -3,6 +3,8 @@ package io.github.zyrouge.symphony.ui.theme
 import androidx.compose.ui.graphics.Color
 
 enum class PrimaryThemeColor {
+    // MAZIKA's brand colour, matching the dark red launcher icon.
+    MazikaRed,
     Red,
     Orange,
     Amber,
@@ -23,6 +25,9 @@ enum class PrimaryThemeColor {
 }
 
 object ThemeColors {
+    // Brand colour of the MAZIKA launcher icon. Slightly lifted from the icon's
+    // #B71C1C so it stays legible as an accent on dark surfaces.
+    val MazikaRed = Color(0xFFD32F2F)
     val Red = Color(0xFFEF4444)
     val Orange = Color(0xFFF97316)
     val Amber = Color(0xFFF59E0B)
@@ -47,8 +52,10 @@ object ThemeColors {
     val Neutral800 = Color(0xFF262626)
     val Neutral900 = Color(0xFF171717)
 
-    val DefaultPrimaryColor = PrimaryThemeColor.Purple
+    // MAZIKA defaults to its own brand red rather than Symphony's purple.
+    val DefaultPrimaryColor = PrimaryThemeColor.MazikaRed
     val PrimaryColorsMap = mapOf(
+        PrimaryThemeColor.MazikaRed to MazikaRed,
         PrimaryThemeColor.Red to Red,
         PrimaryThemeColor.Orange to Orange,
         PrimaryThemeColor.Amber to Amber,

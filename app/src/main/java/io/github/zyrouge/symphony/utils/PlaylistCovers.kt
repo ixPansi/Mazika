@@ -10,6 +10,7 @@ import io.github.zyrouge.symphony.Symphony
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * MAZIKA: durable storage and processing of user-selected custom playlist covers.
@@ -35,19 +36,42 @@ object PlaylistCovers {
         File(coversDir(symphony.applicationContext), name)
 
     /**
+     * A user-chosen square crop, expressed as fractions of the source image so it
+     * stays correct regardless of the sample size used when decoding.
+     *
+     * [left] and [top] are the crop's origin as fractions of the image width/height.
+     * [size] is the square's side length as a fraction of the image *width* (image
+     * pixels are square, so the same pixel count applies vertically).
+     */
+    data class CropRegion(
+        val left: Float,
+        val top: Float,
+        val size: Float,
+    )
+
+    /**
      * Reads [sourceUri] through the content resolver, produces a square optimised
      * copy and stores it. Returns the stored file name, or null if the image could
      * not be read/decoded (caller should surface an error, never crash).
+     *
+     * When [crop] is given, that region is used; otherwise the image is centre-cropped.
      */
-    fun saveFromUri(symphony: Symphony, playlistId: String, sourceUri: Uri): String? {
+    fun saveFromUri(
+        symphony: Symphony,
+        playlistId: String,
+        sourceUri: Uri,
+        crop: CropRegion? = null,
+    ): String? {
         val context = symphony.applicationContext
         val resolver = context.contentResolver
         try {
             // 1. Read bounds only, so we can pick a safe sample size.
+            // NOTE: with inJustDecodeBounds the decode intentionally returns null and
+            // only fills in `bounds`, so the stream itself is what we null-check here.
+            // Treating the decode result as the success signal rejected every image.
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(sourceUri)?.use {
-                BitmapFactory.decodeStream(it, null, bounds)
-            } ?: return null
+            val boundsStream = resolver.openInputStream(sourceUri) ?: return null
+            boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
                 return null
             }
@@ -71,8 +95,11 @@ object PlaylistCovers {
             }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
             bitmap = applyOrientation(bitmap, orientation)
 
-            // 4. Centre-crop to a square.
-            bitmap = centerCropSquare(bitmap)
+            // 4. Apply the user's crop if they framed one, else centre-crop.
+            bitmap = when (crop) {
+                null -> centerCropSquare(bitmap)
+                else -> applyCrop(bitmap, crop)
+            }
 
             // 5. Scale down to at most MAX_SIZE.
             if (bitmap.width > MAX_SIZE) {
@@ -151,6 +178,21 @@ object PlaylistCovers {
             sample *= 2
         }
         return sample
+    }
+
+    /**
+     * Crops the region the user framed. Fractions are clamped and the result is
+     * forced square and kept inside the bitmap, so a bad region can never throw.
+     */
+    private fun applyCrop(bitmap: Bitmap, crop: CropRegion): Bitmap {
+        val side = (crop.size * bitmap.width)
+            .roundToInt()
+            .coerceIn(1, min(bitmap.width, bitmap.height))
+        val x = (crop.left * bitmap.width).roundToInt().coerceIn(0, bitmap.width - side)
+        val y = (crop.top * bitmap.height).roundToInt().coerceIn(0, bitmap.height - side)
+        val cropped = Bitmap.createBitmap(bitmap, x, y, side, side)
+        if (cropped != bitmap) bitmap.recycle()
+        return cropped
     }
 
     private fun centerCropSquare(bitmap: Bitmap): Bitmap {

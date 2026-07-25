@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -111,7 +114,13 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
                     ConsiderContributingTile(context)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size((configuration.smallestScreenWidthDp * 0.25).dp)) {
-                            AsyncImage(R.drawable.ic_launcher_foreground, null)
+                            // MAZIKA: the in-app logo is tinted with the active theme
+                            // colour, so it follows whichever theme is selected.
+                            Image(
+                                painter = painterResource(R.drawable.ic_launcher_monochrome),
+                                contentDescription = AppMeta.appName,
+                                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                            )
                         }
                         Column {
                             Text(AppMeta.appName, style = MaterialTheme.typography.titleMedium)

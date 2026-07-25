@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import io.github.zyrouge.symphony.ui.theme.ThemeIcons
 import io.github.zyrouge.symphony.ui.view.BaseView
 import io.github.zyrouge.symphony.utils.Logger
 import kotlin.system.exitProcess
@@ -51,6 +52,9 @@ class MainActivity : ComponentActivity() {
         symphony.permission.handle(this)
         gSymphony = symphony
         symphony.emitActivityReady()
+        // MAZIKA: keep the launcher icon in step with the saved theme preset (e.g.
+        // after a reinstall, where component states reset to the manifest defaults).
+        ThemeIcons.apply(applicationContext, symphony.settings.themePreset.value)
         attachHandlers()
 
         enableEdgeToEdge()

@@ -13,6 +13,7 @@ import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
 import io.github.zyrouge.symphony.services.radio.RadioQueue
 import io.github.zyrouge.symphony.ui.components.ResponsiveGridColumns
 import io.github.zyrouge.symphony.ui.theme.ThemeMode
+import io.github.zyrouge.symphony.ui.theme.ThemePreset
 import io.github.zyrouge.symphony.ui.view.HomePage
 import io.github.zyrouge.symphony.ui.view.HomePageBottomBarLabelVisibility
 import io.github.zyrouge.symphony.ui.view.NowPlayingControlsLayout
@@ -120,9 +121,14 @@ class Settings(private val symphony: Symphony) {
         }
     }
 
-    val themeMode = EnumEntry("theme_mode", enumEntries<ThemeMode>(), ThemeMode.SYSTEM)
+    // MAZIKA: default to the brand preset (dark red on dark) instead of following
+    // the system, and keep Material You off by default so the brand colour is what
+    // users actually see. Turning Material You on still overrides the preset colour
+    // with the wallpaper palette, as before.
+    val themeMode = EnumEntry("theme_mode", enumEntries<ThemeMode>(), ThemePreset.Default.themeMode)
     val language = NullableStringEntry("language")
-    val useMaterialYou = BooleanEntry("material_you", true)
+    val useMaterialYou = BooleanEntry("material_you", false)
+    val themePreset = EnumEntry("theme_preset", enumEntries<ThemePreset>(), ThemePreset.Default)
     val lastUsedSongsSortBy = EnumEntry(
         "last_used_song_sort_by",
         enumEntries<SongRepository.SortBy>(),

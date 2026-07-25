@@ -428,43 +428,19 @@ fun PlaylistDropdownMenu(
     }
 
     pickedCoverUri?.let { uri ->
-        AlertDialog(
+        PlaylistCoverCropDialog(
+            context,
+            uri = uri,
             onDismissRequest = { pickedCoverUri = null },
-            title = {
-                Text(context.symphony.t.ChangePlaylistCover)
-            },
-            text = {
-                // Square centre-cropped preview matching how the cover will be stored.
-                AsyncImage(
-                    model = uri,
-                    contentDescription = context.symphony.t.ChangePlaylistCover,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp)),
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pickedCoverUri = null
-                        context.symphony.groove.playlist.setCustomCover(playlist, uri) { success ->
-                            Toast.makeText(
-                                context.activity,
-                                if (success) context.symphony.t.PlaylistCoverUpdated
-                                else context.symphony.t.UnableToSavePlaylistCover,
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    }
-                ) {
-                    Text(context.symphony.t.SetAsCover)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pickedCoverUri = null }) {
-                    Text(context.symphony.t.Cancel)
+            onConfirm = { crop ->
+                pickedCoverUri = null
+                context.symphony.groove.playlist.setCustomCover(playlist, uri, crop) { success ->
+                    Toast.makeText(
+                        context.activity,
+                        if (success) context.symphony.t.PlaylistCoverUpdated
+                        else context.symphony.t.UnableToSavePlaylistCover,
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             },
         )
