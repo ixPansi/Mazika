@@ -168,6 +168,7 @@ fun SongTreeListContent(
         derivedStateOf { queue.getOrNull(queueIndex) }
     }
     val favoriteIds by context.symphony.groove.playlist.favorites.collectAsState()
+    val coverUpdateId by context.symphony.groove.song.customCoverUpdateId.collectAsState()
 
     LazyColumn(
         state = lazyListState,
@@ -254,8 +255,11 @@ fun SongTreeListContent(
                                 .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
                         ) {
                             AsyncImage(
-                                song.createArtworkImageRequest(context.symphony)
-                                    .build(),
+                                // MAZIKA: this view offers the cover menu too, so it is
+                                // keyed on the custom-cover signal to redraw at once.
+                                remember(song.id, coverUpdateId) {
+                                    song.createArtworkImageRequest(context.symphony).build()
+                                },
                                 null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

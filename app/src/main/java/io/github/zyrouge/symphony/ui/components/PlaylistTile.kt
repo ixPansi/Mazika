@@ -70,6 +70,10 @@ fun PlaylistTile(context: ViewContext, playlist: Playlist) {
         context.symphony.groove.playlist.get(playlist.id) ?: playlist
     }
 
+    // A playlist with no cover of its own falls back to its first song's artwork, so a
+    // custom song cover has to invalidate this tile too.
+    val coverUpdateId by context.symphony.groove.song.customCoverUpdateId.collectAsState()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -83,7 +87,7 @@ fun PlaylistTile(context: ViewContext, playlist: Playlist) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box {
                     AsyncImage(
-                        remember(updateId, current) {
+                        remember(updateId, current, coverUpdateId) {
                             current.createArtworkImageRequest(context.symphony).build()
                         },
                         null,

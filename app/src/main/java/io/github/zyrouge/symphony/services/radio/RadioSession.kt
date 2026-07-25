@@ -242,6 +242,18 @@ class RadioSession(val symphony: Symphony) {
         }
     }
 
+    /**
+     * MAZIKA: a song's artwork changed under it. Drops the decoded bitmap and, if that
+     * song is the one playing, republishes so the notification, lock screen and Android
+     * Auto pick the new cover up straight away instead of at the next track change.
+     */
+    fun refreshArtwork(songId: String) {
+        artworkCacher.invalidate(songId)
+        if (symphony.radio.queue.currentSongId == songId) {
+            update()
+        }
+    }
+
     fun cancel() {
         notification.cancel()
         mediaSession.isActive = false

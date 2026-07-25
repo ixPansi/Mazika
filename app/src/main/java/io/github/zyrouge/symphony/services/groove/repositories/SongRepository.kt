@@ -62,7 +62,23 @@ class SongRepository(private val symphony: Symphony) {
     val count = _count.asStateFlow()
     private val _id = MutableStateFlow(System.currentTimeMillis())
     val id = _id.asStateFlow()
+
+    /**
+     * MAZIKA: bumped whenever a custom song cover is set or cleared, so anything showing
+     * song artwork can redraw immediately.
+     *
+     * Deliberately separate from [id], which also ticks once per song during a library
+     * scan — driving artwork off that would rebuild every image request thousands of
+     * times while scanning.
+     */
+    private val _customCoverUpdateId = MutableStateFlow(0L)
+    val customCoverUpdateId = _customCoverUpdateId.asStateFlow()
+
     var explorer = SimpleFileSystem.Folder()
+
+    private fun emitCustomCoverUpdate() = _customCoverUpdateId.update {
+        System.currentTimeMillis()
+    }
 
     private fun emitCount() = _count.update { cache.size }
 
@@ -184,6 +200,7 @@ class SongRepository(private val symphony: Symphony) {
                 CustomCovers.delete(symphony, previous, CustomCovers.SONG_DIRECTORY)
             }
             emitIds()
+            onArtworkChanged(song.id)
             withContext(Dispatchers.Main) { onResult(true) }
         }
     }
@@ -193,10 +210,26 @@ class SongRepository(private val symphony: Symphony) {
         val song = get(songId) ?: return
         val previous = customCovers.remove(song.path) ?: return
         emitIds()
+        onArtworkChanged(song.id)
         symphony.groove.coroutineScope.launch {
             symphony.database.songCovers.delete(song.path)
             CustomCovers.delete(symphony, previous, CustomCovers.SONG_DIRECTORY)
         }
+    }
+
+    /**
+     * Announces that a song's artwork changed.
+     *
+     * The saved file carries a timestamp in its name, so the URI is always new and Coil
+     * cannot serve a stale image — all the UI needs is a reason to recompose. The media
+     * session is a separate matter: it holds decoded bitmaps keyed by song id, which
+     * would otherwise keep the old cover on the notification, lock screen and Android
+     * Auto until the track changed.
+     */
+    private fun onArtworkChanged(songId: String) {
+        emitCustomCoverUpdate()
+        runCatching { symphony.radio.session.refreshArtwork(songId) }
+            .onFailure { Logger.warn("SongRepository", "unable to refresh session artwork: $it") }
     }
 
     fun getDefaultArtworkUri() = Assets.getPlaceholderUri(symphony)

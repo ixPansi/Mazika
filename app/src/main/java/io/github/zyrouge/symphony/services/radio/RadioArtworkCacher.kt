@@ -10,8 +10,14 @@ import io.github.zyrouge.symphony.ui.helpers.Assets
 
 class RadioArtworkCacher(val symphony: Symphony) {
     private var default: Bitmap? = null
-    private var cached = mutableMapOf<String, Bitmap>()
+    private var cached = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
     private val cacheLimit = 3
+
+    /** MAZIKA: drops a song's cached bitmap so the next read re-decodes it. Needed when
+     * the user replaces a song's cover — the id has not changed, only the image. */
+    fun invalidate(songId: String) {
+        cached.remove(songId)
+    }
 
     suspend fun getArtwork(song: Song): Bitmap {
         return cached[song.id] ?: kotlin.run {

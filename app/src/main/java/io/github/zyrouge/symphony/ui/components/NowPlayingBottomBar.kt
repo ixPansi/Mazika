@@ -110,6 +110,7 @@ fun NowPlayingBottomBar(context: ViewContext, insetPadding: Boolean = true) {
     val showSeekControls by context.symphony.settings.miniPlayerSeekControls.flow.collectAsState()
     val seekBackDuration by context.symphony.settings.seekBackDuration.flow.collectAsState()
     val seekForwardDuration by context.symphony.settings.seekForwardDuration.flow.collectAsState()
+    val coverUpdateId by context.symphony.groove.song.customCoverUpdateId.collectAsState()
 
     AnimatedContent(
         modifier = Modifier.fillMaxWidth(),
@@ -174,8 +175,13 @@ fun NowPlayingBottomBar(context: ViewContext, insetPadding: Boolean = true) {
                                 from togetherWith to
                             },
                         ) { song ->
+                            // MAZIKA: keyed on the custom-cover signal too, so replacing
+                            // a cover updates the mini player without a relaunch.
+                            val artworkRequest = remember(song.id, coverUpdateId) {
+                                song.createArtworkImageRequest(context.symphony).build()
+                            }
                             AsyncImage(
-                                song.createArtworkImageRequest(context.symphony).build(),
+                                artworkRequest,
                                 null,
                                 modifier = Modifier
                                     .size(45.dp)

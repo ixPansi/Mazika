@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -83,6 +84,12 @@ fun SongCard(
     val isFavorite by remember(favoriteSongIds, song) {
         derivedStateOf { favoriteSongIds.contains(song.id) }
     }
+    // MAZIKA: rebuild the request when a custom cover is set or cleared, so the new
+    // artwork appears immediately rather than on the next launch.
+    val coverUpdateId by context.symphony.groove.song.customCoverUpdateId.collectAsState()
+    val artworkRequest = remember(song.id, coverUpdateId) {
+        song.createArtworkImageRequest(context.symphony).build()
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -94,7 +101,7 @@ fun SongCard(
                 leading()
                 Box {
                     AsyncImage(
-                        song.createArtworkImageRequest(context.symphony).build(),
+                        artworkRequest,
                         null,
                         modifier = Modifier
                             .size(45.dp)
@@ -153,18 +160,36 @@ fun SongCard(
                 Spacer(modifier = Modifier.width(15.dp))
 
                 Row {
-                    if (!disableHeartIcon && isFavorite) {
+                    // MAZIKA: always-present favourite toggle, so a song can be
+                    // hearted from the list without opening the overflow menu. It used
+                    // to appear only once a song was already a favourite, which made it
+                    // an un-favourite button and nothing else.
+                    if (!disableHeartIcon) {
                         IconButton(
                             modifier = Modifier.offset(4.dp, 0.dp),
                             onClick = {
-                                context.symphony.groove.playlist.unfavorite(song.id)
+                                context.symphony.groove.playlist.run {
+                                    when {
+                                        isFavorite -> unfavorite(song.id)
+                                        else -> favorite(song.id)
+                                    }
+                                }
                             }
                         ) {
                             Icon(
-                                Icons.Filled.Favorite,
-                                null,
+                                when {
+                                    isFavorite -> Icons.Filled.Favorite
+                                    else -> Icons.Filled.FavoriteBorder
+                                },
+                                when {
+                                    isFavorite -> context.symphony.t.Unfavorite
+                                    else -> context.symphony.t.Favorite
+                                },
                                 modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = when {
+                                    isFavorite -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                             )
                         }
                     }
@@ -209,7 +234,10 @@ fun SongDropdownMenu(
 
     // MAZIKA: custom song cover, same flow as playlist covers (pick -> crop -> save).
     var pickedCoverUri by remember { mutableStateOf<Uri?>(null) }
-    val hasCustomCover = context.symphony.groove.song.hasCustomCover(song.id)
+    val coverUpdateId by context.symphony.groove.song.customCoverUpdateId.collectAsState()
+    val hasCustomCover = remember(song.id, coverUpdateId) {
+        context.symphony.groove.song.hasCustomCover(song.id)
+    }
     val coverPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> if (uri != null) pickedCoverUri = uri }

@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -128,6 +129,10 @@ private fun NowPlayingBodyCoverArtwork(
     song: Song,
     onOpenLyrics: () -> Unit,
 ) {
+    // MAZIKA: the song object is unchanged when only its cover is replaced, so the
+    // artwork request is keyed on the cover signal as well to redraw straight away.
+    val coverUpdateId by context.symphony.groove.song.customCoverUpdateId.collectAsState()
+
     BoxWithConstraints {
         val dimension = min(this@BoxWithConstraints.maxHeight, this@BoxWithConstraints.maxWidth)
 
@@ -140,10 +145,11 @@ private fun NowPlayingBodyCoverArtwork(
                     .togetherWith(FadeTransition.exitTransition())
             },
         ) { targetStateSong ->
+            val artworkRequest = remember(targetStateSong.id, coverUpdateId) {
+                targetStateSong.createArtworkImageRequest(context.symphony).build()
+            }
             AsyncImage(
-                targetStateSong
-                    .createArtworkImageRequest(context.symphony)
-                    .build(),
+                artworkRequest,
                 null,
                 contentScale = ContentScale.Crop,
                 filterQuality = FilterQuality.High,
