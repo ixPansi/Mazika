@@ -105,14 +105,13 @@
   declared with **`android:resource`** (not `android:value` - Android Auto resolves
   that metadata as a resource id, and using `android:value` stops the app from ever
   appearing in the car app list).
-- Lyrics on the driving screen: originally omitted on driver-distraction grounds, then
-  added at the user's explicit request after the constraint was put to them. Two forms,
-  because Android Auto media apps cannot draw a custom screen and so a player button
-  cannot open a lyrics page: a player custom action that swaps the current *single*
-  timed lyric line into the artist line, and a browsable Lyrics category carrying the
-  full text. The category is listed last and can be switched off; the toggle is off by
-  default and resets when playback stops. Caveat recorded in `ANDROID_AUTO_TESTING.md`:
-  the line is session metadata, so the lock screen shows it too while it is on.
+- No lyrics on the driving screen. (Briefly implemented on request as a player custom
+  action plus a browse category, then removed — Android Auto media apps cannot draw a
+  custom screen, so neither form was a real lyrics view.)
+- The queue is reachable from the **Queue** button on the playback screen, with cover
+  art. It cannot be surfaced on Android Auto's home screen: the "For you" card there
+  belongs to Android Auto, and there is no API for an app to add a page to it or to
+  change its order.
 
 ### Rebranding
 - `app_name` → MAZIKA (main/debug/canary), `AppMeta.appName` → MAZIKA (upstream
@@ -172,8 +171,8 @@ test failures introduced by this work.
 
 ### Release (signed) - the shipping build
 - Path: `artifacts/MAZIKA.apk` (copy of `app-universal-release.apk`)
-- Size: **14,300,438 bytes** (R8-minified; ABI splits are ~9 MB each)
-- SHA-256: `15dc5890ea3dcde4592eb179d971b1c306cfb81445646250ed3d9b08b30a1735`
+- Size: **14,299,746 bytes** (R8-minified; ABI splits are ~9 MB each)
+- SHA-256: `758d870e420ceae0f3b83337271e8f7f10fa1f8222b65945c7d211da04309b82`
 - Application id: `com.mazika.musicplayer` - label `MAZIKA`
 - Version: `2024.12.115` (versionCode 115)
 - Min Android: 9 (API 28); target API 34

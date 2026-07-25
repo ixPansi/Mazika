@@ -20,11 +20,7 @@ import io.github.zyrouge.symphony.R
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.services.groove.Song
 import io.github.zyrouge.symphony.utils.Logger
-import io.github.zyrouge.symphony.utils.TimedContent
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -53,12 +49,6 @@ class RadioSession(val symphony: Symphony) {
      */
     @Volatile
     internal var browserClientPackage: String? = null
-
-    // MAZIKA: Android Auto lyrics mode - see [toggleLyrics].
-    private var lyricsEnabled = false
-    private var lyricsJob: Job? = null
-    private var lyricsLine: String? = null
-    private var lastRequest: UpdateRequest? = null
 
     /**
      * MAZIKA: search-and-play entry point shared by the media session callback and the
@@ -175,8 +165,6 @@ class RadioSession(val symphony: Symphony) {
                         ACTION_SEEK_FORWARD -> symphony.radio.shorty.seekFromCurrent(
                             symphony.settings.seekForwardDuration.value
                         )
-
-                        ACTION_TOGGLE_LYRICS -> toggleLyrics()
                     }
                 }
 
@@ -257,10 +245,6 @@ class RadioSession(val symphony: Symphony) {
     fun cancel() {
         notification.cancel()
         mediaSession.isActive = false
-        // Do not leave the lock screen showing a lyric line after playback ends.
-        lyricsEnabled = false
-        lyricsLine = null
-        restartLyricsTicker()
     }
 
     fun destroy() {
@@ -366,36 +350,35 @@ class RadioSession(val symphony: Symphony) {
             playbackPosition = playbackPosition,
             isPlaying = isPlaying,
         )
-        lastRequest = req
         updateSession(req)
         notification.update(req)
-    }
-
-    private fun buildMetadata(req: UpdateRequest) = MediaMetadataCompat.Builder().run {
-        putString(MediaMetadataCompat.METADATA_KEY_TITLE, req.song.title)
-        // While lyrics mode is on, the artist line carries the current lyric line
-        // instead - it is the only second line Android Auto's player renders.
-        val subtitle = lyricsLine ?: req.song.artists.joinToString().ifEmpty { null }
-        if (subtitle != null) {
-            putString(MediaMetadataCompat.METADATA_KEY_ARTIST, subtitle)
-        }
-        putString(MediaMetadataCompat.METADATA_KEY_ALBUM, req.song.album)
-        req.artworkBitmap.let {
-            putBitmap(MediaMetadataCompat.METADATA_KEY_ART, it)
-            putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
-            putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, it)
-        }
-        putLong(
-            MediaMetadataCompat.METADATA_KEY_DURATION,
-            req.playbackPosition.total.toLong()
-        )
-        build()
     }
 
     private fun updateSession(req: UpdateRequest) {
         ensureEnabled()
         mediaSession.run {
-            setMetadata(buildMetadata(req))
+            setMetadata(
+                MediaMetadataCompat.Builder().run {
+                    putString(MediaMetadataCompat.METADATA_KEY_TITLE, req.song.title)
+                    if (req.song.artists.isNotEmpty()) {
+                        putString(
+                            MediaMetadataCompat.METADATA_KEY_ARTIST,
+                            req.song.artists.joinToString()
+                        )
+                    }
+                    putString(MediaMetadataCompat.METADATA_KEY_ALBUM, req.song.album)
+                    req.artworkBitmap.let {
+                        putBitmap(MediaMetadataCompat.METADATA_KEY_ART, it)
+                        putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
+                        putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, it)
+                    }
+                    putLong(
+                        MediaMetadataCompat.METADATA_KEY_DURATION,
+                        req.playbackPosition.total.toLong()
+                    )
+                    build()
+                }
+            )
             setPlaybackState(
                 PlaybackStateCompat.Builder().run {
                     setState(
@@ -436,97 +419,9 @@ class RadioSession(val symphony: Symphony) {
                             R.drawable.material_icon_fast_forward,
                         ).build()
                     )
-                    // MAZIKA: lyrics toggle on the Android Auto player.
-                    addCustomAction(
-                        PlaybackStateCompat.CustomAction.Builder(
-                            ACTION_TOGGLE_LYRICS,
-                            symphony.t.Lyrics,
-                            R.drawable.material_icon_lyrics,
-                        ).build()
-                    )
                     build()
                 }
             )
-        }
-    }
-
-    /**
-     * MAZIKA: turns the Android Auto lyrics view on and off.
-     *
-     * Android Auto media apps cannot draw a custom screen, so a player button cannot
-     * open a lyrics page - it can only fire an action. What it does instead is put the
-     * *current* lyric line where the artist name normally sits and keep it in step with
-     * playback: one line at a time, which is also the least distracting shape this can
-     * take while driving. The full sheet lives in the browse tree
-     * ([RadioBrowser.getChildren] on [MediaId.CATEGORY_LYRICS]) for when the car is
-     * parked.
-     *
-     * Only songs with timed (.lrc) lyrics can follow playback; for untimed lyrics the
-     * artist line is left alone and the browse entry is the answer.
-     *
-     * Note that other controllers - the lock screen especially - read the same session
-     * metadata, so they show the lyric line too while this is on. It is off by default
-     * and reset whenever playback stops.
-     */
-    private fun toggleLyrics() {
-        lyricsEnabled = !lyricsEnabled
-        lyricsLine = null
-        restartLyricsTicker()
-        update()
-    }
-
-    private fun restartLyricsTicker() {
-        lyricsJob?.cancel()
-        lyricsJob = null
-        if (!lyricsEnabled) {
-            return
-        }
-        lyricsJob = symphony.groove.coroutineScope.launch {
-            var loadedSongId: String? = null
-            var timed: TimedContent? = null
-            while (isActive) {
-                val song = symphony.radio.queue.currentSongId
-                    ?.let { symphony.groove.song.get(it) }
-                if (song == null) {
-                    setLyricsLine(null)
-                    delay(LYRICS_TICK_MS)
-                    continue
-                }
-                if (song.id != loadedSongId) {
-                    loadedSongId = song.id
-                    timed = try {
-                        symphony.groove.song.getLyrics(song)
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { TimedContent.fromLyrics(it) }
-                    } catch (err: Exception) {
-                        Logger.warn("RadioSession", "unable to load lyrics: $err")
-                        null
-                    }
-                }
-                val position = symphony.radio.currentPlaybackPosition?.played?.toLong() ?: 0L
-                setLyricsLine(
-                    timed?.takeIf { it.isSynced }
-                        ?.pairs
-                        ?.lastOrNull { it.first <= position }
-                        ?.second
-                        ?.takeIf { it.isNotBlank() }
-                )
-                delay(LYRICS_TICK_MS)
-            }
-        }
-    }
-
-    /** Republishes metadata only when the line actually changed, which is every few
-     * seconds rather than every tick. */
-    private suspend fun setLyricsLine(line: String?) {
-        if (line == lyricsLine) {
-            return
-        }
-        lyricsLine = line
-        val req = lastRequest ?: return
-        withContext(Dispatchers.Main) {
-            runCatching { mediaSession.setMetadata(buildMetadata(req)) }
-                .onFailure { Logger.warn("RadioSession", "unable to publish lyrics line: $it") }
         }
     }
 
@@ -547,12 +442,8 @@ class RadioSession(val symphony: Symphony) {
         // MAZIKA: custom transport actions surfaced on the Android Auto player.
         const val ACTION_SEEK_BACK = "com.mazika.musicplayer.SEEK_BACK"
         const val ACTION_SEEK_FORWARD = "com.mazika.musicplayer.SEEK_FORWARD"
-        const val ACTION_TOGGLE_LYRICS = "com.mazika.musicplayer.TOGGLE_LYRICS"
 
         // Android Auto refuses very large queues; this is well past what is useful.
         private const val MAX_QUEUE_ITEMS = 200
-
-        // Fine enough to land on the right lyric line, coarse enough to be free.
-        private const val LYRICS_TICK_MS = 500L
     }
 }

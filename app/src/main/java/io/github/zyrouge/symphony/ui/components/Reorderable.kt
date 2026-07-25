@@ -1,5 +1,8 @@
 package io.github.zyrouge.symphony.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
@@ -20,6 +23,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.isActive
@@ -154,7 +158,9 @@ class ReorderableState internal constructor(
     }
 
     companion object {
-        private const val AUTO_SCROLL_STEP = 24f
+        /** Pixels per frame when a drag is pushed past a viewport edge — at 60fps this
+         * is a gentle crawl rather than the list rocketing away under the finger. */
+        private const val AUTO_SCROLL_STEP = 8f
     }
 }
 
@@ -260,9 +266,21 @@ fun LazyItemScope.reorderableItemModifier(
                 shadowElevation = 8f
             }
 
-        else -> Modifier.animateItem()
+        else -> Modifier.animateItem(placementSpec = ReorderPlacementSpec)
     }
 }
+
+/**
+ * How a displaced row travels to its new place. Deliberately slower and softer than
+ * Compose's default (`StiffnessMediumLow`, ~400): at the default the rows snap past
+ * each other faster than the eye follows, which reads as a glitch rather than as a
+ * swap. No bounce, because a row overshooting its slot looks like a second move.
+ */
+private val ReorderPlacementSpec = spring(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = Spring.StiffnessVeryLow,
+    visibilityThreshold = IntOffset.VisibilityThreshold,
+)
 
 /**
  * Makes a whole row draggable after a long press. Use where there is no room for a
