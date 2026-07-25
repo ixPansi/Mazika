@@ -2,25 +2,37 @@
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- MAZIKA — bold "M" wordmark drawn within the adaptive-icon safe zone. -->
-    <path
-        android:pathData="M30,78 L30,32 L54,59 L78,32 L78,78"
-        android:strokeWidth="12"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="#00000000">
-        <aapt:attr name="android:strokeColor">
+    android:viewportWidth="1000"
+    android:viewportHeight="1000">
+  <!-- MAZIKA: the original waveform mark, recoloured to dark red. -->
+  <group android:scaleX="0.4"
+      android:scaleY="0.4"
+      android:translateX="300"
+      android:translateY="300">
+    <group>
+      <clip-path
+          android:pathData="M0,0h1000v1000h-1000z"/>
+      <group>
+        <clip-path
+            android:pathData="M937,425L937,425A50,50 0,0 1,987 475L987,525A50,50 0,0 1,937 575L937,575A50,50 0,0 1,887 525L887,475A50,50 0,0 1,937 425zM762,225L762,225A50,50 0,0 1,812 275L812,725A50,50 0,0 1,762 775L762,775A50,50 0,0 1,712 725L712,275A50,50 0,0 1,762 225zM587,45L587,45A50,50 0,0 1,637 95L637,795A50,50 0,0 1,587 845L587,845A50,50 0,0 1,537 795L537,95A50,50 0,0 1,587 45zM412,954.1L412,954.1A50,50 0,0 1,362 904.1L362,204.1A50,50 0,0 1,412 154.1L412,154.1A50,50 0,0 1,462 204.1L462,904.1A50,50 0,0 1,412 954.1zM237,750L237,750A50,50 0,0 1,187 700L187,300A50,50 0,0 1,237 250L237,250A50,50 0,0 1,287 300L287,700A50,50 0,0 1,237 750zM62,625L62,625A50,50 0,0 1,12 575L12,425A50,50 0,0 1,62 375L62,375A50,50 0,0 1,112 425L112,575A50,50 0,0 1,62 625z"/>
+        <path
+            android:pathData="M0,45h1000v909h-1000z"
+            android:fillColor="#B71C1C"/>
+        <path
+            android:pathData="M0,45h1000v909h-1000z">
+          <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="30"
-                android:startY="30"
-                android:endX="78"
-                android:endY="80"
+                android:startX="500"
+                android:startY="45"
+                android:endX="500"
+                android:endY="954"
                 android:type="linear">
-                <item android:offset="0" android:color="#FFC084FC" />
-                <item android:offset="1" android:color="#FFA855F7" />
+              <item android:offset="0" android:color="#FFB71C1C"/>
+              <item android:offset="1" android:color="#FF7F0000"/>
             </gradient>
-        </aapt:attr>
-    </path>
+          </aapt:attr>
+        </path>
+      </group>
+    </group>
+  </group>
 </vector>

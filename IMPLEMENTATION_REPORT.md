@@ -153,8 +153,8 @@ test failures introduced by this work.
 
 ### Debug (installable, debug-signed)
 - Path: `artifacts/MAZIKA-debug.apk` (copy of `app-universal-debug.apk`)
-- Size: **84,256,861 bytes**
-- SHA-256: `1a0a9d04864b4e24b756e5eebcd6ae9e2f3e189f909afefafcf6a6b3f3b0384b`
+- Size: **84,258,495 bytes**
+- SHA-256: `8a00c8eda271343dc17febe18afbacd34f5fac6eb90fb3740d8bd1ba52db9505`
 - Application id: `com.mazika.musicplayer.debug`
 - Version: `2024.12.115-debug` (versionCode 115)
 - Min Android: 9 (API 28); target API 34
