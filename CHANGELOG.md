@@ -18,7 +18,18 @@
   row, on every swap). The slide is deliberately slower than Compose's default, which
   snaps rows past each other faster than the eye follows.
 - Auto-scroll at the list edges no longer spawns a coroutine per pointer event; one
-  frame-driven loop runs for the duration of the drag, at a gentler speed.
+  frame-driven loop runs for the duration of the drag.
+- **Edge auto-scroll now runs at one speed in both directions.** Dragging towards the
+  bottom used to run away while dragging towards the top felt slow and stuck, because
+  the reorder check only ran on finger movement: hold still at an edge and the list
+  scrolled under a pinned row without swapping anything, then a single twitch moved it
+  one position. The check now runs every frame the list is scrolling. Alongside that:
+  the rate is a fixed dp-per-second integrated over real frame time (it was pixels per
+  *frame*, so a 120Hz screen scrolled at double the rate of a 60Hz one, and it varied
+  with display density), the trigger band is identical at both ends, and the loop stops
+  pushing once the list reaches an end instead of grinding against it.
+- The drop-target test used an inclusive range, so a row landing exactly on a boundary
+  matched two rows and always resolved upwards.
 - Reordered rows keep their identity when the list is rebuilt from the persisted
   order, so a drag no longer ends in a visible rebuild of the list.
 - Releasing a drag that moved nothing no longer persists or rewrites the queue.

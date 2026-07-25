@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -23,10 +24,13 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.isActive
+import kotlin.math.abs
 
 /**
  * MAZIKA: drag-to-reorder for a [androidx.compose.foundation.lazy.LazyColumn].
@@ -68,13 +72,20 @@ class ReorderableState internal constructor(
     private var dragged by mutableFloatStateOf(0f)
 
     /**
-     * How far the list wants to scroll this frame because the row was pushed past an
-     * edge. Read by the auto-scroll loop in [rememberReorderableState]; a plain value
-     * rather than a coroutine launch per pointer event, which used to spawn dozens of
-     * competing scrolls a second.
+     * Which way the list should auto-scroll: `-1` towards the start, `+1` towards the
+     * end, `0` not at all. Deliberately a *direction* and not a distance — the speed
+     * lives entirely in [rememberReorderableState]'s loop, so there is no quantity left
+     * that could come out different depending on which way the row is being dragged.
      */
-    internal var scrollDelta by mutableFloatStateOf(0f)
+    internal var scrollDirection by mutableIntStateOf(0)
         private set
+
+    /**
+     * Width of the band at each end of the viewport inside which auto-scroll engages.
+     * Set from the composable, which is where density lives. The same value is used at
+     * both ends.
+     */
+    internal var scrollBandPx = 0f
 
     /** Whether this gesture actually reordered anything, so a tap-and-release on the
      * handle does not trigger a pointless persist. */
@@ -103,36 +114,14 @@ class ReorderableState internal constructor(
         draggingIndex = dataIndex
         initialOffset = item?.offset ?: 0
         dragged = 0f
-        scrollDelta = 0f
+        scrollDirection = 0
         moved = false
     }
 
     internal fun onDrag(delta: Float) {
         dragged += delta
-        val current = draggingItem ?: return
-
-        // Where the dragged row actually is on screen right now.
-        val start = current.offset + draggingOffset
-        val middle = start + current.size / 2f
-
-        // A move triggers when the dragged row's midpoint crosses into another row,
-        // which gives one clean swap per boundary instead of several per frame.
-        val first = firstItemIndex()
-        val last = first + itemCount() - 1
-        val target = listState.layoutInfo.visibleItemsInfo.fastFirstOrNull { item ->
-            item.index != current.index &&
-                    item.index in first..last &&
-                    middle.toInt() in item.offset..(item.offset + item.size)
-        }
-        if (target != null) {
-            val to = target.index - first
-            val from = current.index - first
-            onMove(from, to)
-            draggingIndex = to
-            moved = true
-        }
-
-        updateScrollDelta(start, start + current.size)
+        recheckTarget()
+        updateScrollDirection()
     }
 
     internal fun onDragEnd() {
@@ -140,27 +129,67 @@ class ReorderableState internal constructor(
         draggingIndex = null
         dragged = 0f
         initialOffset = 0
-        scrollDelta = 0f
+        scrollDirection = 0
         moved = false
         if (shouldSettle) {
             onSettle()
         }
     }
 
-    /** Nudges the list when the dragged row is pushed past a viewport edge. */
-    private fun updateScrollDelta(start: Float, end: Float) {
-        val info = listState.layoutInfo
-        scrollDelta = when {
-            end > info.viewportEndOffset -> (end - info.viewportEndOffset)
-            start < info.viewportStartOffset -> (start - info.viewportStartOffset)
-            else -> 0f
-        }.coerceIn(-AUTO_SCROLL_STEP, AUTO_SCROLL_STEP)
+    /**
+     * Swaps the dragged row with whichever row its midpoint now sits inside.
+     *
+     * Called from the drag gesture *and* from the auto-scroll loop. It has to be both:
+     * when the finger is held still at an edge the list keeps moving underneath, and if
+     * only the gesture drove this the row would sit pinned while the list scrolled past
+     * it, then jump a single position the moment the finger twitched.
+     */
+    internal fun recheckTarget() {
+        val current = draggingItem ?: return
+
+        // Where the dragged row actually is on screen right now.
+        val start = current.offset + draggingOffset
+        val middle = start + current.size / 2f
+
+        // A move triggers when the dragged row's midpoint crosses into another row,
+        // which gives one clean swap per boundary instead of several per frame. The
+        // range is half-open: an inclusive one matches two rows at an exact boundary,
+        // and the scan would always resolve that to the upper one.
+        val first = firstItemIndex()
+        val last = first + itemCount() - 1
+        val target = listState.layoutInfo.visibleItemsInfo.fastFirstOrNull { item ->
+            item.index != current.index &&
+                    item.index in first..last &&
+                    middle >= item.offset &&
+                    middle < item.offset + item.size
+        } ?: return
+        onMove(current.index - first, target.index - first)
+        draggingIndex = target.index - first
+        moved = true
     }
 
-    companion object {
-        /** Pixels per frame when a drag is pushed past a viewport edge — at 60fps this
-         * is a gentle crawl rather than the list rocketing away under the finger. */
-        private const val AUTO_SCROLL_STEP = 8f
+    /**
+     * Decides whether the list should be scrolling, and which way.
+     *
+     * The test is the same at both ends — same band, same comparison — so neither
+     * direction can engage earlier or run further than the other.
+     */
+    internal fun updateScrollDirection() {
+        val current = draggingItem ?: return
+        val info = listState.layoutInfo
+        val start = current.offset + draggingOffset
+        val end = start + current.size
+        val band = minOf(scrollBandPx, current.size.toFloat())
+        scrollDirection = when {
+            end > info.viewportEndOffset - band -> 1
+            start < info.viewportStartOffset + band -> -1
+            else -> 0
+        }
+    }
+
+    /** Called by the loop when the list refused to move, so it stops pushing. */
+    internal fun onScrollExhausted() {
+        scrollDirection = 0
     }
 }
 
@@ -220,20 +249,59 @@ fun rememberReorderableState(
             onSettle = { currentOnSettle() },
         )
     }
+    // Density is only reachable from composition, so resolve the two dp values here and
+    // hand the state the pixel band it needs.
+    val density = LocalDensity.current
+    val speedPxPerSecond = with(density) { REORDER_SCROLL_SPEED.toPx() }
+    val bandPx = with(density) { REORDER_SCROLL_BAND.toPx() }
+    SideEffect { state.scrollBandPx = bandPx }
+
     // One scroll loop for the whole drag instead of a coroutine per pointer event.
     val isDragging = state.draggingIndex != null
-    LaunchedEffect(state, isDragging) {
+    LaunchedEffect(state, isDragging, speedPxPerSecond) {
         if (!isDragging) return@LaunchedEffect
+        var previousFrame = 0L
         while (isActive) {
-            withFrameNanos { }
-            val delta = state.scrollDelta
-            if (delta != 0f) {
-                listState.scrollBy(delta)
+            val frame = withFrameNanos { it }
+            val elapsed = when (previousFrame) {
+                // Nothing to integrate over on the first frame of the drag.
+                0L -> 0f
+                // Cap the step so a dropped frame cannot turn into one long jump.
+                else -> ((frame - previousFrame) / 1_000_000_000f).coerceAtMost(MAX_FRAME_STEP)
+            }
+            previousFrame = frame
+            val direction = state.scrollDirection
+            if (direction == 0 || elapsed <= 0f) {
+                continue
+            }
+            // Speed is per second, not per frame: otherwise a 120Hz screen scrolls at
+            // twice the rate of a 60Hz one for the same code.
+            val consumed = listState.scrollBy(direction * speedPxPerSecond * elapsed)
+            if (abs(consumed) < 0.5f) {
+                // The list is already at an end; stop pushing against it.
+                state.onScrollExhausted()
+            } else {
+                // Keep swapping rows as the list moves under a stationary finger.
+                state.recheckTarget()
             }
         }
     }
     return state
 }
+
+/**
+ * Auto-scroll rate while a drag sits at the edge of the list, in dp per second, applied
+ * identically in both directions. This is the one number to change if the scroll wants
+ * to be faster or slower.
+ */
+private val REORDER_SCROLL_SPEED = 120.dp
+
+/** How close to either end of the viewport a dragged row gets before the list starts
+ * scrolling. Capped at the row height so short rows behave sensibly. */
+private val REORDER_SCROLL_BAND = 48.dp
+
+/** Longest frame step to integrate over (~4 frames at 60Hz). */
+private const val MAX_FRAME_STEP = 0.064f
 
 /**
  * Styling for a reorderable row: the dragged one is lifted and follows the finger,
@@ -258,16 +326,23 @@ fun LazyItemScope.reorderableItemModifier(
     val dragging by remember(state, index) {
         derivedStateOf { state.draggingIndex == index }
     }
-    return when {
-        dragging -> Modifier
-            .zIndex(1f)
-            .graphicsLayer {
-                translationY = state.draggingOffset
-                shadowElevation = 8f
-            }
+    // animateItem stays in the chain for every row and only its spec changes. Adding or
+    // removing it mid-drag restructures the item's modifier chain, which resets the
+    // placement animator and shows up as a glitch exactly when a row starts or stops
+    // being dragged. The dragged row passes null: its position is driven by hand.
+    return Modifier
+        .zIndex(if (dragging) 1f else 0f)
+        .then(
+            when {
+                dragging -> Modifier.graphicsLayer {
+                    translationY = state.draggingOffset
+                    shadowElevation = 8f
+                }
 
-        else -> Modifier.animateItem(placementSpec = ReorderPlacementSpec)
-    }
+                else -> Modifier
+            }
+        )
+        .animateItem(placementSpec = if (dragging) null else ReorderPlacementSpec)
 }
 
 /**
