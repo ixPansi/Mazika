@@ -4,19 +4,24 @@ import android.net.Uri
 import androidx.core.net.toUri
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.services.groove.Song
+import io.github.zyrouge.symphony.services.groove.SongCover
 import io.github.zyrouge.symphony.ui.helpers.Assets
 import io.github.zyrouge.symphony.ui.helpers.createHandyImageRequest
 import io.github.zyrouge.symphony.utils.FuzzySearchOption
 import io.github.zyrouge.symphony.utils.FuzzySearcher
+import io.github.zyrouge.symphony.utils.CustomCovers
 import io.github.zyrouge.symphony.utils.KeyGenerator
 import io.github.zyrouge.symphony.utils.Logger
 import io.github.zyrouge.symphony.utils.SimpleFileSystem
 import io.github.zyrouge.symphony.utils.SimplePath
 import io.github.zyrouge.symphony.utils.joinToStringIfNotEmpty
 import io.github.zyrouge.symphony.utils.withCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 class SongRepository(private val symphony: Symphony) {
@@ -35,6 +40,10 @@ class SongRepository(private val symphony: Symphony) {
     }
 
     private val cache = ConcurrentHashMap<String, Song>()
+
+    // MAZIKA: user-chosen per-song covers, keyed by song path so they survive the id
+    // regeneration that happens on every rescan.
+    private val customCovers = ConcurrentHashMap<String, String>()
     internal val pathCache = ConcurrentHashMap<String, String>()
     internal val idGenerator = KeyGenerator.TimeIncremental()
     private val searcher = FuzzySearcher<String>(
@@ -119,9 +128,76 @@ class SongRepository(private val symphony: Symphony) {
     fun get(id: String) = cache[id]
     fun get(ids: List<String>) = ids.mapNotNull { get(it) }
 
-    fun getArtworkUri(songId: String): Uri = get(songId)?.coverFile
-        ?.let { symphony.database.artworkCache.get(it) }?.toUri()
-        ?: getDefaultArtworkUri()
+    /** Custom cover file name for a song, if the user set one. */
+    fun getCustomCoverFile(songId: String): String? =
+        get(songId)?.path?.let { customCovers[it] }
+
+    fun hasCustomCover(songId: String) = getCustomCoverFile(songId) != null
+
+    // MAZIKA artwork precedence: a valid custom cover, then the embedded artwork,
+    // then the placeholder. A missing custom file falls through instead of blanking.
+    fun getArtworkUri(songId: String): Uri {
+        getCustomCoverFile(songId)
+            ?.let { CustomCovers.resolveFile(symphony, it, CustomCovers.SONG_DIRECTORY) }
+            ?.takeIf { it.exists() }
+            ?.let { return it.toUri() }
+        return get(songId)?.coverFile
+            ?.let { symphony.database.artworkCache.get(it) }?.toUri()
+            ?: getDefaultArtworkUri()
+    }
+
+    /** Loads stored custom covers; called once the library has been scanned. */
+    internal suspend fun fetchCustomCovers() {
+        try {
+            val entries = symphony.database.songCovers.entries()
+            customCovers.clear()
+            entries.forEach { customCovers[it.path] = it.coverFile }
+            CustomCovers.cleanupOrphans(
+                symphony,
+                customCovers.values.toSet(),
+                CustomCovers.SONG_DIRECTORY,
+            )
+        } catch (err: Exception) {
+            Logger.error("SongRepository", "unable to load custom covers", err)
+        }
+    }
+
+    /** Stores a user-selected image as this song's cover. */
+    fun setCustomCover(
+        songId: String,
+        sourceUri: Uri,
+        crop: CustomCovers.CropRegion? = null,
+        onResult: (Boolean) -> Unit,
+    ) {
+        val song = get(songId) ?: return onResult(false)
+        symphony.groove.coroutineScope.launch {
+            val name = CustomCovers.saveFromUri(
+                symphony, song.id, sourceUri, crop, CustomCovers.SONG_DIRECTORY,
+            )
+            if (name == null) {
+                withContext(Dispatchers.Main) { onResult(false) }
+                return@launch
+            }
+            val previous = customCovers.put(song.path, name)
+            symphony.database.songCovers.upsert(SongCover(song.path, name))
+            if (previous != null && previous != name) {
+                CustomCovers.delete(symphony, previous, CustomCovers.SONG_DIRECTORY)
+            }
+            emitIds()
+            withContext(Dispatchers.Main) { onResult(true) }
+        }
+    }
+
+    /** Clears a song's custom cover, restoring its embedded artwork. */
+    fun removeCustomCover(songId: String) {
+        val song = get(songId) ?: return
+        val previous = customCovers.remove(song.path) ?: return
+        emitIds()
+        symphony.groove.coroutineScope.launch {
+            symphony.database.songCovers.delete(song.path)
+            CustomCovers.delete(symphony, previous, CustomCovers.SONG_DIRECTORY)
+        }
+    }
 
     fun getDefaultArtworkUri() = Assets.getPlaceholderUri(symphony)
 

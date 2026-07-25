@@ -272,7 +272,7 @@ class RadioBrowser(private val symphony: Symphony) {
             .setMediaId(MediaId.of(MediaId.TYPE_SONG, songId, contextType, contextId))
             .setTitle(song.title)
             .setSubtitle(song.artists.joinToString().ifEmpty { null })
-            .apply { coversUri(song.coverFile)?.let { setIconUri(it) } }
+            .apply { songArtworkUri(song.id, song.coverFile)?.let { setIconUri(it) } }
             .build()
         return MediaItem(description, MediaItem.FLAG_PLAYABLE)
     }
@@ -330,6 +330,12 @@ class RadioBrowser(private val symphony: Symphony) {
 
     private fun coversUri(coverFile: String?): Uri? =
         coverFile?.let { ArtworkProvider.coversUri(context, it) }
+
+    /** A song's custom cover if it has one, else its embedded artwork. */
+    private fun songArtworkUri(songId: String, coverFile: String?): Uri? =
+        symphony.groove.song.getCustomCoverFile(songId)
+            ?.let { ArtworkProvider.songCoverUri(context, it) }
+            ?: coversUri(coverFile)
 
     private fun playlistIconUri(playlist: Playlist): Uri? {
         playlist.customCoverPath?.let {

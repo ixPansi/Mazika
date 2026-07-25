@@ -27,6 +27,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -201,6 +207,13 @@ fun SongDropdownMenu(
     var showInfoDialog by remember { mutableStateOf(false) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
 
+    // MAZIKA: custom song cover, same flow as playlist covers (pick -> crop -> save).
+    var pickedCoverUri by remember { mutableStateOf<Uri?>(null) }
+    val hasCustomCover = context.symphony.groove.song.hasCustomCover(song.id)
+    val coverPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> if (uri != null) pickedCoverUri = uri }
+
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest
@@ -334,6 +347,39 @@ fun SongDropdownMenu(
         )
         DropdownMenuItem(
             leadingIcon = {
+                Icon(Icons.Filled.Image, null)
+            },
+            text = {
+                Text(context.symphony.t.ChangeSongCover)
+            },
+            onClick = {
+                onDismissRequest()
+                coverPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            }
+        )
+        if (hasCustomCover) {
+            DropdownMenuItem(
+                leadingIcon = {
+                    Icon(Icons.Filled.HideImage, null)
+                },
+                text = {
+                    Text(context.symphony.t.RemoveCustomCover)
+                },
+                onClick = {
+                    onDismissRequest()
+                    context.symphony.groove.song.removeCustomCover(song.id)
+                    Toast.makeText(
+                        context.activity,
+                        context.symphony.t.SongCoverRemoved,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            )
+        }
+        DropdownMenuItem(
+            leadingIcon = {
                 Icon(Icons.Filled.Info, null)
             },
             text = {
@@ -345,6 +391,25 @@ fun SongDropdownMenu(
             }
         )
         trailingContent?.invoke(this, onDismissRequest)
+    }
+
+    pickedCoverUri?.let { uri ->
+        PlaylistCoverCropDialog(
+            context,
+            uri = uri,
+            onDismissRequest = { pickedCoverUri = null },
+            onConfirm = { crop ->
+                pickedCoverUri = null
+                context.symphony.groove.song.setCustomCover(song.id, uri, crop) { success ->
+                    Toast.makeText(
+                        context.activity,
+                        if (success) context.symphony.t.SongCoverUpdated
+                        else context.symphony.t.UnableToSavePlaylistCover,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            },
+        )
     }
 
     if (showInfoDialog) {

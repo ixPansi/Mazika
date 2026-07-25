@@ -13,7 +13,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * MAZIKA: durable storage and processing of user-selected custom playlist covers.
+ * MAZIKA: durable storage and processing of user-selected artwork, used for both
+ * custom playlist covers and custom song covers (they differ only by folder).
  *
  * A selected image is decoded with sampling (so very large images cannot OOM),
  * rotated according to its EXIF orientation, centre-cropped to a square, scaled
@@ -24,16 +25,22 @@ import kotlin.math.roundToInt
  *
  * All methods here perform disk/IO work and must be called off the main thread.
  */
-object PlaylistCovers {
-    private const val DIRECTORY = "playlist_covers"
+object CustomCovers {
+    /** Internal-storage folders for user-chosen artwork. */
+    const val PLAYLIST_DIRECTORY = "playlist_covers"
+    const val SONG_DIRECTORY = "song_covers"
     const val MAX_SIZE = 1024
     private const val QUALITY = 85
 
-    fun coversDir(context: Context): File = File(context.filesDir, DIRECTORY)
+    fun coversDir(context: Context, directory: String = PLAYLIST_DIRECTORY): File =
+        File(context.filesDir, directory)
 
     /** Resolves a stored cover file name to an absolute [File]. */
-    fun resolveFile(symphony: Symphony, name: String): File =
-        File(coversDir(symphony.applicationContext), name)
+    fun resolveFile(
+        symphony: Symphony,
+        name: String,
+        directory: String = PLAYLIST_DIRECTORY,
+    ): File = File(coversDir(symphony.applicationContext, directory), name)
 
     /**
      * A user-chosen square crop, expressed as fractions of the source image so it
@@ -61,6 +68,7 @@ object PlaylistCovers {
         playlistId: String,
         sourceUri: Uri,
         crop: CropRegion? = null,
+        directory: String = PLAYLIST_DIRECTORY,
     ): String? {
         val context = symphony.applicationContext
         val resolver = context.contentResolver
@@ -111,7 +119,7 @@ object PlaylistCovers {
             }
 
             // 6. Write atomically (temp file -> rename) as WebP.
-            val dir = coversDir(context)
+            val dir = coversDir(context, directory)
             if (!dir.exists()) dir.mkdirs()
             val name = "${sanitizeId(playlistId)}_${System.currentTimeMillis()}.webp"
             val destination = File(dir, name)
@@ -133,26 +141,34 @@ object PlaylistCovers {
             }
             return name
         } catch (err: Exception) {
-            Logger.error("PlaylistCovers", "failed to save cover for $playlistId", err)
+            Logger.error("CustomCovers", "failed to save cover for $playlistId", err)
             return null
         }
     }
 
     /** Deletes a stored cover file by name. Safe to call with a null/blank name. */
-    fun delete(symphony: Symphony, name: String?) {
+    fun delete(
+        symphony: Symphony,
+        name: String?,
+        directory: String = PLAYLIST_DIRECTORY,
+    ) {
         if (name.isNullOrBlank()) return
         runCatching {
-            val file = resolveFile(symphony, name)
+            val file = resolveFile(symphony, name, directory)
             if (file.exists()) file.delete()
         }.onFailure {
-            Logger.warn("PlaylistCovers", "failed to delete cover $name: $it")
+            Logger.warn("CustomCovers", "failed to delete cover $name: $it")
         }
     }
 
     /** Removes stored cover files that are no longer referenced by any playlist. */
-    fun cleanupOrphans(symphony: Symphony, referencedNames: Set<String>) {
+    fun cleanupOrphans(
+        symphony: Symphony,
+        referencedNames: Set<String>,
+        directory: String = PLAYLIST_DIRECTORY,
+    ) {
         runCatching {
-            val dir = coversDir(symphony.applicationContext)
+            val dir = coversDir(symphony.applicationContext, directory)
             if (!dir.isDirectory) return
             dir.listFiles()?.forEach { file ->
                 if (file.name !in referencedNames) {
@@ -160,7 +176,7 @@ object PlaylistCovers {
                 }
             }
         }.onFailure {
-            Logger.warn("PlaylistCovers", "orphan cleanup failed: $it")
+            Logger.warn("CustomCovers", "orphan cleanup failed: $it")
         }
     }
 

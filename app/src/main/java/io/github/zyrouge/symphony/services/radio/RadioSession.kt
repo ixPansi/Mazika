@@ -10,6 +10,7 @@ import android.media.audiofx.AudioEffect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -18,7 +19,10 @@ import androidx.activity.result.contract.ActivityResultContract
 import io.github.zyrouge.symphony.R
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.services.groove.Song
+import io.github.zyrouge.symphony.utils.Logger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class RadioSession(val symphony: Symphony) {
     data class UpdateRequest(
@@ -105,6 +109,12 @@ class RadioSession(val symphony: Symphony) {
                 override fun onStop() {
                     super.onStop()
                     handleAction(ACTION_STOP)
+                }
+
+                // MAZIKA: tapping an entry in Android Auto's queue view.
+                override fun onSkipToQueueItem(id: Long) {
+                    super.onSkipToQueueItem(id)
+                    symphony.radio.jumpTo(id.toInt())
                 }
 
                 override fun onSeekTo(pos: Long) {
@@ -200,10 +210,14 @@ class RadioSession(val symphony: Symphony) {
             }
         )
         notification.start()
+        updateQueue()
         symphony.radio.onUpdate.subscribe {
             when (it) {
                 Radio.Events.Player.Ended -> cancel()
                 is Radio.Events.Player -> update()
+                // MAZIKA: keep the published queue in step, so Android Auto's queue
+                // view reflects adds, removals and reordering immediately.
+                is Radio.Events.Queue -> updateQueue()
                 else -> {}
             }
         }
@@ -242,6 +256,36 @@ class RadioSession(val symphony: Symphony) {
             resultCode: Int,
             intent: Intent?,
         ) {
+        }
+    }
+
+    /**
+     * MAZIKA: publishes the play queue to the media session so Android Auto shows the
+     * real upcoming songs (and lets the user jump to one) instead of falling back to
+     * browse content. The queue item id is the queue index, which is what
+     * onSkipToQueueItem receives back.
+     */
+    private fun updateQueue() {
+        symphony.groove.coroutineScope.launch {
+            val items = symphony.radio.queue.currentQueue
+                .take(MAX_QUEUE_ITEMS)
+                .mapIndexedNotNull { index, songId ->
+                    val song = symphony.groove.song.get(songId) ?: return@mapIndexedNotNull null
+                    val description = MediaDescriptionCompat.Builder()
+                        .setMediaId(MediaId.of(MediaId.TYPE_SONG, songId))
+                        .setTitle(song.title)
+                        .setSubtitle(song.artists.joinToString().ifEmpty { null })
+                        .build()
+                    MediaSessionCompat.QueueItem(description, index.toLong())
+                }
+            withContext(Dispatchers.Main) {
+                runCatching {
+                    mediaSession.setQueue(items)
+                    mediaSession.setQueueTitle(symphony.t.Queue)
+                }.onFailure {
+                    Logger.warn("RadioSession", "unable to publish queue: $it")
+                }
+            }
         }
     }
 
@@ -323,6 +367,7 @@ class RadioSession(val symphony: Symphony) {
                                 or PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
                                 or PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
                                 or PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID
+                                or PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM
                     )
                     addCustomAction(
                         PlaybackStateCompat.CustomAction.Builder(
@@ -361,5 +406,8 @@ class RadioSession(val symphony: Symphony) {
         // MAZIKA: custom transport actions surfaced on the Android Auto player.
         const val ACTION_SEEK_BACK = "com.mazika.musicplayer.SEEK_BACK"
         const val ACTION_SEEK_FORWARD = "com.mazika.musicplayer.SEEK_FORWARD"
+
+        // Android Auto refuses very large queues; this is well past what is useful.
+        private const val MAX_QUEUE_ITEMS = 200
     }
 }

@@ -129,14 +129,14 @@ fun SongList(
                     val canReorder = onReorder != null &&
                             leadingContent == null &&
                             sortBy == SongRepository.SortBy.CUSTOM
-                    val localOrder = remember { mutableStateListOf<String>() }
+                    val localOrder = remember { mutableStateListOf<ReorderableEntry<String>>() }
                     LaunchedEffect(sortedSongIds) {
                         localOrder.clear()
-                        localOrder.addAll(sortedSongIds)
+                        localOrder.addAll(sortedSongIds.toReorderableEntries())
                     }
-                    val displayedSongIds = when {
+                    val displayedEntries = when {
                         canReorder -> localOrder
-                        else -> sortedSongIds
+                        else -> sortedSongIds.toReorderableEntries()
                     }
                     val reorderState = rememberReorderableState(
                         listState = lazyListState,
@@ -146,7 +146,7 @@ fun SongList(
                                 localOrder.add(to, localOrder.removeAt(from))
                             }
                         },
-                        onSettle = { onReorder?.invoke(localOrder.toList()) },
+                        onSettle = { onReorder?.invoke(localOrder.map { it.value }) },
                     )
 
                     LazyColumn(
@@ -155,11 +155,11 @@ fun SongList(
                     ) {
                         leadingContent?.invoke(this)
                         itemsIndexed(
-                            displayedSongIds,
-                            key = { i, x -> "$i-$x" },
+                            displayedEntries,
+                            key = { _, entry -> entry.uid },
                             contentType = { _, _ -> Groove.Kind.SONG }
-                        ) { i, songId ->
-                            context.symphony.groove.song.get(songId)?.let { song ->
+                        ) { i, entry ->
+                            context.symphony.groove.song.get(entry.value)?.let { song ->
                                 Box(
                                     modifier = Modifier
                                         .zIndex(if (reorderState.draggingIndex == i) 1f else 0f)
@@ -196,7 +196,7 @@ fun SongList(
                                         },
                                     ) {
                                         context.symphony.radio.shorty.playQueue(
-                                            displayedSongIds,
+                                            displayedEntries.map { it.value },
                                             Radio.PlayOptions(index = i)
                                         )
                                     }

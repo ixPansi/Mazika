@@ -37,7 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.utils.Logger
-import io.github.zyrouge.symphony.utils.PlaylistCovers
+import io.github.zyrouge.symphony.utils.CustomCovers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -48,7 +48,7 @@ import kotlin.math.min
  *
  * The image is shown inside a square viewport; dragging pans it and pinching
  * zooms, exactly like a normal photo cropper, and "Center" resets the framing.
- * The visible square is converted into a [PlaylistCovers.CropRegion] in source-image
+ * The visible square is converted into a [CustomCovers.CropRegion] in source-image
  * fractions, so the saved file matches what was on screen no matter what sample
  * size the decoder used.
  *
@@ -59,7 +59,7 @@ fun PlaylistCoverCropDialog(
     context: ViewContext,
     uri: Uri,
     onDismissRequest: () -> Unit,
-    onConfirm: (PlaylistCovers.CropRegion) -> Unit,
+    onConfirm: (CustomCovers.CropRegion) -> Unit,
 ) {
     val localContext = LocalContext.current
 
@@ -224,7 +224,7 @@ internal fun toCropRegion(
     offsetX: Float,
     offsetY: Float,
     viewportPx: Float,
-): PlaylistCovers.CropRegion {
+): CustomCovers.CropRegion {
     // Fraction of the source covered by the viewport: with Crop the shorter side
     // exactly fills it, so at scale 1 the square spans 1/aspect of the width for a
     // landscape image (and the whole width for a portrait one).
@@ -242,7 +242,7 @@ internal fun toCropRegion(
 
     val left = (centerX - widthFraction / 2f).coerceIn(0f, 1f - widthFraction)
     val top = (centerY - heightFraction / 2f).coerceIn(0f, 1f - heightFraction)
-    return PlaylistCovers.CropRegion(
+    return CustomCovers.CropRegion(
         left = left,
         top = top,
         size = min(widthFraction, 1f),

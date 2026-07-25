@@ -8,7 +8,7 @@ import io.github.zyrouge.symphony.utils.FuzzySearchOption
 import io.github.zyrouge.symphony.utils.FuzzySearcher
 import io.github.zyrouge.symphony.utils.KeyGenerator
 import io.github.zyrouge.symphony.utils.Logger
-import io.github.zyrouge.symphony.utils.PlaylistCovers
+import io.github.zyrouge.symphony.utils.CustomCovers
 import io.github.zyrouge.symphony.utils.mutate
 import io.github.zyrouge.symphony.utils.withCase
 import kotlinx.coroutines.Dispatchers
@@ -91,7 +91,7 @@ class PlaylistRepository(private val symphony: Symphony) {
             getFavorites().getSongIds(symphony)
         }
         // Remove cover files no longer referenced by any playlist.
-        PlaylistCovers.cleanupOrphans(
+        CustomCovers.cleanupOrphans(
             symphony,
             cache.values.mapNotNull { it.customCoverPath }.toSet(),
         )
@@ -178,7 +178,7 @@ class PlaylistRepository(private val symphony: Symphony) {
         symphony.groove.coroutineScope.launch {
             symphony.database.playlists.delete(id)
             // Clean up the app-owned custom cover file (never the user's gallery).
-            PlaylistCovers.delete(symphony, removed?.customCoverPath)
+            CustomCovers.delete(symphony, removed?.customCoverPath)
         }
     }
 
@@ -212,11 +212,11 @@ class PlaylistRepository(private val symphony: Symphony) {
     fun setCustomCover(
         playlist: Playlist,
         sourceUri: android.net.Uri,
-        crop: PlaylistCovers.CropRegion? = null,
+        crop: CustomCovers.CropRegion? = null,
         onResult: (Boolean) -> Unit,
     ) {
         symphony.groove.coroutineScope.launch {
-            val name = PlaylistCovers.saveFromUri(symphony, playlist.id, sourceUri, crop)
+            val name = CustomCovers.saveFromUri(symphony, playlist.id, sourceUri, crop)
             if (name == null) {
                 withContext(Dispatchers.Main) { onResult(false) }
                 return@launch
@@ -228,7 +228,7 @@ class PlaylistRepository(private val symphony: Symphony) {
             emitUpdateId()
             symphony.database.playlists.update(updated)
             if (previous != null && previous != name) {
-                PlaylistCovers.delete(symphony, previous)
+                CustomCovers.delete(symphony, previous)
             }
             withContext(Dispatchers.Main) { onResult(true) }
         }
@@ -244,7 +244,7 @@ class PlaylistRepository(private val symphony: Symphony) {
         emitUpdateId()
         symphony.groove.coroutineScope.launch {
             symphony.database.playlists.update(updated)
-            PlaylistCovers.delete(symphony, previous)
+            CustomCovers.delete(symphony, previous)
         }
     }
 

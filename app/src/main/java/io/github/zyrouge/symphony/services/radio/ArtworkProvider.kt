@@ -29,6 +29,7 @@ class ArtworkProvider : ContentProvider() {
         val baseDir = when (segments[0]) {
             SEGMENT_COVERS -> File(ctx.dataDir, "covers")
             SEGMENT_PLAYLIST_COVERS -> File(ctx.filesDir, "playlist_covers")
+            SEGMENT_SONG_COVERS -> File(ctx.filesDir, "song_covers")
             else -> return null
         }
         val name = try {
@@ -75,12 +76,18 @@ class ArtworkProvider : ContentProvider() {
     companion object {
         private const val SEGMENT_COVERS = "covers"
         private const val SEGMENT_PLAYLIST_COVERS = "playlist_covers"
+        private const val SEGMENT_SONG_COVERS = "song_covers"
 
         fun authority(context: Context) = "${context.packageName}.artwork"
 
         /** Uri for a file inside the app's artwork cache (dataDir/covers). */
         fun coversUri(context: Context, name: String): Uri = Uri.parse(
             "content://${authority(context)}/$SEGMENT_COVERS/${MediaId.encode(name)}"
+        )
+
+        /** Uri for a custom song cover (filesDir/song_covers). */
+        fun songCoverUri(context: Context, name: String): Uri = Uri.parse(
+            "content://${authority(context)}/$SEGMENT_SONG_COVERS/${MediaId.encode(name)}"
         )
 
         /** Uri for a custom playlist cover (filesDir/playlist_covers). */

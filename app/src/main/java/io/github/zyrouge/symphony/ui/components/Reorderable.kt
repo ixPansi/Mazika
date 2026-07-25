@@ -3,10 +3,12 @@ package io.github.zyrouge.symphony.ui.components
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -14,19 +16,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 /**
  * MAZIKA: drag-to-reorder for a [androidx.compose.foundation.lazy.LazyColumn].
  *
- * Written against plain Compose gestures rather than pulling in a reordering
- * library, matching how the rest of the app handles gestures (see
- * [io.github.zyrouge.symphony.ui.components.swipeable]).
+ * Built on plain Compose gestures rather than a reordering library, matching how the
+ * rest of the app handles gestures (see [swipeable]).
  *
- * Behaviour: long-press an item to pick it up, drag to move it. The list reorders
- * live as you cross item boundaries, so what you see is the final order, and the
- * list auto-scrolls when you drag near an edge. Releasing commits the result via
- * [onSettle], which is the only point that touches persistent state.
+ * The dragged row's visual offset is **derived from live layout info every frame**
+ * rather than accumulated by hand. That matters: after a move the lazy list has not
+ * relaid out yet, so any offset computed from positions read at that moment is stale
+ * and the row visibly jumps. Deriving it means the row stays exactly under the finger
+ * no matter how many swaps happen or how fast the drag is.
+ *
+ * A move is triggered when the dragged row's midpoint crosses into another row's
+ * bounds, which gives one clean swap per boundary instead of several per frame.
  */
 class ReorderableState internal constructor(
     internal val listState: LazyListState,
@@ -38,42 +42,48 @@ class ReorderableState internal constructor(
     var draggingIndex by mutableStateOf<Int?>(null)
         private set
 
-    /** Pixel offset of the dragged item from its resting position. */
-    var draggingOffset by mutableFloatStateOf(0f)
-        private set
+    /** Where the dragged row sat when the drag began. */
+    private var initialOffset by mutableIntStateOf(0)
 
-    private var draggingItemInitialOffset = 0
+    /** Total distance dragged since the gesture started. */
+    private var dragged by mutableFloatStateOf(0f)
+
+    private val draggingItem: LazyListItemInfo?
+        get() = draggingIndex?.let { index ->
+            listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+        }
+
+    /**
+     * Pixel offset to apply to the dragged row. Derived, never accumulated, so it is
+     * always correct against the current layout.
+     */
+    val draggingOffset: Float
+        get() = draggingItem?.let { initialOffset + dragged - it.offset } ?: 0f
 
     internal fun onDragStart(index: Int) {
+        val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
         draggingIndex = index
-        draggingOffset = 0f
-        draggingItemInitialOffset = visibleItemOffset(index) ?: 0
+        initialOffset = item?.offset ?: 0
+        dragged = 0f
     }
 
     internal fun onDrag(delta: Float) {
-        val current = draggingIndex ?: return
-        draggingOffset += delta
+        dragged += delta
+        val current = draggingItem ?: return
 
-        // Absolute position of the dragged item's top and bottom edges.
-        val size = visibleItemSize(current) ?: return
-        val start = draggingItemInitialOffset + draggingOffset
-        val end = start + size
+        // Where the dragged row actually is on screen right now.
+        val start = current.offset + draggingOffset
+        val middle = start + current.size / 2f
 
-        // Find the item whose midpoint the dragged item has crossed.
-        val target = listState.layoutInfo.visibleItemsInfo
-            .firstOrNull { item ->
-                val middle = item.offset + item.size / 2f
-                item.index != current && middle in start..end
-            }
-            ?: return
+        val target = listState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
+            item.index != current.index && middle.toInt() in item.offset..(item.offset + item.size)
+        }
+        if (target != null) {
+            onMove(current.index, target.index)
+            draggingIndex = target.index
+        }
 
-        onMove(current, target.index)
-        draggingIndex = target.index
-        // Keep the item visually under the finger across the swap.
-        draggingOffset += (draggingItemInitialOffset - (visibleItemOffset(target.index) ?: 0))
-        draggingItemInitialOffset = visibleItemOffset(target.index) ?: 0
-
-        autoScroll(start, end)
+        autoScroll(start, start + current.size)
     }
 
     internal fun onDragEnd() {
@@ -81,43 +91,49 @@ class ReorderableState internal constructor(
             onSettle()
         }
         draggingIndex = null
-        draggingOffset = 0f
+        dragged = 0f
+        initialOffset = 0
     }
 
-    /** Scrolls the list when the dragged item is held near an edge. */
+    /** Nudges the list when the dragged row is pushed past a viewport edge. */
     private fun autoScroll(start: Float, end: Float) {
         val info = listState.layoutInfo
-        val viewportStart = info.viewportStartOffset.toFloat()
-        val viewportEnd = info.viewportEndOffset.toFloat()
         val overshoot = when {
-            end > viewportEnd -> end - viewportEnd
-            start < viewportStart -> start - viewportStart
-            else -> 0f
+            end > info.viewportEndOffset -> end - info.viewportEndOffset
+            start < info.viewportStartOffset -> start - info.viewportStartOffset
+            else -> return
         }
-        if (abs(overshoot) > 0f) {
-            coroutineScope.launch {
-                listState.scrollBy(overshoot.coerceIn(-AUTO_SCROLL_STEP, AUTO_SCROLL_STEP))
-            }
+        coroutineScope.launch {
+            listState.scrollBy(overshoot.coerceIn(-AUTO_SCROLL_STEP, AUTO_SCROLL_STEP))
         }
     }
 
-    private fun visibleItemOffset(index: Int) = listState.layoutInfo.visibleItemsInfo
-        .firstOrNull { it.index == index }?.offset
-
-    private fun visibleItemSize(index: Int) = listState.layoutInfo.visibleItemsInfo
-        .firstOrNull { it.index == index }?.size
-
     companion object {
-        private const val AUTO_SCROLL_STEP = 24f
+        private const val AUTO_SCROLL_STEP = 20f
     }
 }
 
 /**
+ * A list entry carrying an identity that survives reordering.
+ *
+ * LazyColumn keys must be unique *and* stable for a reorder to look right. The obvious
+ * choices both fail here: a song id is not unique (the same song can sit in a queue or
+ * playlist twice) and an index is not stable (it changes for every row a move shifts,
+ * so Compose tears rows down and rebuilds them instead of moving them, which is what
+ * makes a drag feel janky). [uid] is assigned once per snapshot and travels with the
+ * value as it moves.
+ */
+data class ReorderableEntry<T>(val uid: Long, val value: T)
+
+fun <T> List<T>.toReorderableEntries(): List<ReorderableEntry<T>> =
+    mapIndexed { index, value -> ReorderableEntry(index.toLong(), value) }
+
+/**
  * Creates a [ReorderableState].
  *
- * [onMove] is called continuously while dragging so the list can be reordered in
- * memory; [onSettle] fires once on release, and is where the new order should be
- * persisted (a playlist write, a queue update) so dragging does not hammer storage.
+ * [onMove] runs continuously while dragging so the list reorders in memory;
+ * [onSettle] fires once on release and is where the order should be persisted, so a
+ * drag does not hammer storage.
  */
 @Composable
 fun rememberReorderableState(
@@ -130,8 +146,8 @@ fun rememberReorderableState(
 }
 
 /**
- * Makes a whole row draggable after a long press. Use when there is no room for a
- * handle; note it competes with the row's own click, hence the long-press gate.
+ * Makes a whole row draggable after a long press. Use where there is no room for a
+ * handle; the long-press gate keeps it from fighting the row's own click.
  */
 fun Modifier.reorderableItem(state: ReorderableState, index: Int) = this.pointerInput(index) {
     detectDragGesturesAfterLongPress(
@@ -146,9 +162,9 @@ fun Modifier.reorderableItem(state: ReorderableState, index: Int) = this.pointer
 }
 
 /**
- * Turns a small element into a drag handle. Dragging starts immediately (no long
- * press), which is the expected feel for a handle, and because the gesture lives on
- * the handle rather than the row, tapping the row still plays the song.
+ * Turns a small element into a drag handle. Dragging starts immediately, which is the
+ * expected feel for a handle, and because the gesture lives on the handle the row's
+ * own tap keeps working.
  */
 fun Modifier.reorderableHandle(state: ReorderableState, index: Int) = this.pointerInput(index) {
     detectDragGestures(

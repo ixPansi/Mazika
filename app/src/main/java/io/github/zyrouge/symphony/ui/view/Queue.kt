@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import io.github.zyrouge.symphony.ui.components.rememberReorderableState
 import io.github.zyrouge.symphony.ui.components.reorderableHandle
+import io.github.zyrouge.symphony.ui.components.ReorderableEntry
+import io.github.zyrouge.symphony.ui.components.toReorderableEntries
 import io.github.zyrouge.symphony.ui.components.SongCard
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
@@ -70,11 +72,14 @@ fun QueueView(context: ViewContext) {
     // MAZIKA: drag-to-reorder. The list is reordered in this local copy while the
     // finger is down so dragging stays smooth, and the queue is only rewritten once
     // on release - reordering never restarts or changes the playing song.
-    val reorderableQueue = remember { mutableStateListOf<String>() }
+    val reorderableQueue = remember { mutableStateListOf<ReorderableEntry<String>>() }
     LaunchedEffect(queue) {
         reorderableQueue.clear()
-        reorderableQueue.addAll(queue)
+        reorderableQueue.addAll(queue.toReorderableEntries())
     }
+    // Only one item moves during a drag; everything else just shifts. So the whole
+    // gesture collapses to a single move from where it started to where it ended,
+    // which is what gets applied to the real queue on release.
     var pendingMove by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val reorderState = rememberReorderableState(
         listState = listState,
@@ -87,7 +92,9 @@ fun QueueView(context: ViewContext) {
         },
         onSettle = {
             pendingMove?.let { (from, to) ->
-                context.symphony.radio.queue.move(from, to)
+                if (from != to) {
+                    context.symphony.radio.queue.move(from, to)
+                }
             }
             pendingMove = null
         },
@@ -163,10 +170,10 @@ fun QueueView(context: ViewContext) {
                     LazyColumn(state = listState) {
                         itemsIndexed(
                             reorderableQueue,
-                            key = { i, id -> "$i-$id" },
+                            key = { _, entry -> entry.uid },
                             contentType = { _, _ -> Groove.Kind.SONG },
-                        ) { i, songId ->
-                            context.symphony.groove.song.get(songId)?.let { song ->
+                        ) { i, entry ->
+                            context.symphony.groove.song.get(entry.value)?.let { song ->
                                 Box(
                                     modifier = Modifier
                                         .zIndex(if (reorderState.draggingIndex == i) 1f else 0f)

@@ -9,7 +9,7 @@ import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.ui.helpers.Assets
 import io.github.zyrouge.symphony.ui.helpers.createHandyImageRequest
 import io.github.zyrouge.symphony.utils.DocumentFileX
-import io.github.zyrouge.symphony.utils.PlaylistCovers
+import io.github.zyrouge.symphony.utils.CustomCovers
 import io.github.zyrouge.symphony.utils.SimplePath
 import kotlin.io.path.Path
 import kotlin.io.path.nameWithoutExtension
@@ -24,7 +24,7 @@ data class Playlist(
     val uri: Uri?,
     val path: String?,
     // MAZIKA: relative file name of a user-selected custom cover stored in
-    // internal storage (see [PlaylistCovers]); null means use the default artwork.
+    // internal storage (see [CustomCovers]); null means use the default artwork.
     val customCoverPath: String? = null,
 ) {
     val numberOfTracks: Int get() = songPaths.size
@@ -37,7 +37,7 @@ data class Playlist(
     // through to the generated artwork so a stale reference never blanks the tile.
     fun createArtworkImageRequest(symphony: Symphony): ImageRequest.Builder {
         val customCover = customCoverPath
-            ?.let { PlaylistCovers.resolveFile(symphony, it) }
+            ?.let { CustomCovers.resolveFile(symphony, it) }
             ?.takeIf { it.exists() }
         if (customCover != null) {
             return createHandyImageRequest(

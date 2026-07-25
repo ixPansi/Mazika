@@ -53,6 +53,8 @@ class Groove(private val symphony: Symphony) : Symphony.Hooks {
                 async { exposer.fetch() },
                 async { playlist.fetch() },
             )
+            // Custom song covers are keyed by path, so they load once songs exist.
+            song.fetchCustomCovers()
         }.join()
     }
 
