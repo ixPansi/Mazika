@@ -10,6 +10,7 @@ import io.github.zyrouge.symphony.services.groove.repositories.ArtistRepository
 import io.github.zyrouge.symphony.services.groove.repositories.GenreRepository
 import io.github.zyrouge.symphony.services.groove.repositories.PlaylistRepository
 import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
+import io.github.zyrouge.symphony.services.radio.AndroidAutoCategory
 import io.github.zyrouge.symphony.services.radio.RadioQueue
 import io.github.zyrouge.symphony.ui.components.ResponsiveGridColumns
 import io.github.zyrouge.symphony.ui.theme.ThemeMode
@@ -100,6 +101,28 @@ class Settings(private val symphony: Symphony) {
 
         override fun setValueInternal(value: Set<String>) = getSharedPreferences().edit {
             putStringSet(key, value)
+        }
+    }
+
+    /**
+     * MAZIKA: like [EnumSetEntry] but order-preserving, for settings where the
+     * sequence is the point (e.g. the Android Auto category order).
+     */
+    inner class EnumListEntry<T : Enum<T>>(
+        key: String,
+        values: EnumEntries<T>,
+        val defaultValue: List<T>,
+    ) : Entry<List<T>>(key) {
+        private val entries = values.associateBy { it.name }
+
+        override fun getValueInternal() = getSharedPreferences().getString(key, null)
+            ?.split(",")
+            ?.mapNotNull { entries[it] }
+            ?.takeIf { it.isNotEmpty() }
+            ?: defaultValue
+
+        override fun setValueInternal(value: List<T>) = getSharedPreferences().edit {
+            putString(key, value.joinToString(",") { it.name })
         }
     }
 
@@ -302,7 +325,9 @@ class Settings(private val symphony: Symphony) {
     val nowPlayingAdditionalInfo = BooleanEntry("show_now_playing_additional_info", true)
     val nowPlayingSeekControls = BooleanEntry("enable_seek_controls", false)
     val seekBackDuration = IntEntry("seek_back_duration", 15)
-    val seekForwardDuration = IntEntry("seek_back_duration", 30)
+    // MAZIKA: this reused "seek_back_duration" upstream, so the forward and back
+    // durations shared one stored value and changing either changed both.
+    val seekForwardDuration = IntEntry("seek_forward_duration", 30)
     val miniPlayerTrackControls = BooleanEntry("mini_player_extended_controls", false)
     val miniPlayerSeekControls = BooleanEntry("mini_player_seek_controls", false)
     val fontFamily = NullableStringEntry("font_family")
@@ -337,6 +362,12 @@ class Settings(private val symphony: Symphony) {
         "artwork_quality",
         enumEntries<ImagePreserver.Quality>(),
         ImagePreserver.Quality.Medium,
+    )
+    // MAZIKA: which categories appear on the Android Auto root screen, in order.
+    val androidAutoCategories = EnumListEntry(
+        "android_auto_categories",
+        enumEntries<AndroidAutoCategory>(),
+        AndroidAutoCategory.Default,
     )
     val useMetaphony = BooleanEntry("use_metaphony", true)
     val gaplessPlayback = BooleanEntry("gapless_playback", true)

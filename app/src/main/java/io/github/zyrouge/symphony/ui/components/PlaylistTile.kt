@@ -62,6 +62,14 @@ import io.github.zyrouge.symphony.utils.Logger
 fun PlaylistTile(context: ViewContext, playlist: Playlist) {
     val updateId by context.symphony.groove.playlist.updateId.collectAsState()
 
+    // MAZIKA: the caller resolves the Playlist with a plain repository lookup, which
+    // is not a snapshot read, so its instance goes stale as soon as the playlist is
+    // edited - which is why a newly set cover only appeared after an app restart.
+    // Re-resolve here whenever the repository signals a change.
+    val current = remember(updateId, playlist.id) {
+        context.symphony.groove.playlist.get(playlist.id) ?: playlist
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -75,9 +83,8 @@ fun PlaylistTile(context: ViewContext, playlist: Playlist) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box {
                     AsyncImage(
-                        // TODO: remove this hack after moving to reactive objects
-                        remember(updateId, playlist) {
-                            playlist.createArtworkImageRequest(context.symphony).build()
+                        remember(updateId, current) {
+                            current.createArtworkImageRequest(context.symphony).build()
                         },
                         null,
                         contentScale = ContentScale.Crop,
@@ -98,7 +105,7 @@ fun PlaylistTile(context: ViewContext, playlist: Playlist) {
                             Icon(Icons.Filled.MoreVert, null)
                             PlaylistDropdownMenu(
                                 context,
-                                playlist,
+                                current,
                                 expanded = showOptionsMenu,
                                 onDismissRequest = {
                                     showOptionsMenu = false
@@ -120,7 +127,7 @@ fun PlaylistTile(context: ViewContext, playlist: Playlist) {
                                 .then(Modifier.size(36.dp)),
                             onClick = {
                                 context.symphony.radio.shorty.playQueue(
-                                    playlist.getSortedSongIds(context.symphony)
+                                    current.getSortedSongIds(context.symphony)
                                 )
                             }
                         ) {
@@ -130,7 +137,7 @@ fun PlaylistTile(context: ViewContext, playlist: Playlist) {
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    playlist.title,
+                    current.title,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )

@@ -90,6 +90,13 @@ checklist as Method 1 — plus:
 - Disconnecting (close DHU) must not corrupt playback state — the phone keeps playing.
 - Pause/resume from the car UI must honour the **Fade on pause and resume** setting.
 - Confirm **no lyrics** are shown on the car screen (driver-distraction rule).
+- The playback screen shows **seek back / seek forward** buttons using the same
+  durations as the phone (Settings -> Player). These are media-session *custom
+  actions*, so they appear on the full player only - Android Auto's dashboard media
+  card next to the map keeps just play/pause and next/previous, which is the intended
+  driver-safe behaviour.
+- The root screen order follows **Settings -> Android Auto** on the phone, so you can
+  put Playlists (or anything else) first.
 
 Useful DHU keys: `?` for help, and you can simulate driving with the day/night and
 distraction-mode toggles.

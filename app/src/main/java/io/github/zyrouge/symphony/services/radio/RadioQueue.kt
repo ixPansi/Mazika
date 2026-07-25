@@ -90,6 +90,32 @@ class RadioQueue(private val symphony: Symphony) {
         }
     }
 
+    /**
+     * MAZIKA: moves a queued song, keeping the currently playing track pointed at the
+     * same song so reordering never interrupts or changes playback.
+     *
+     * Only [currentQueue] is reordered - [originalQueue] is the pre-shuffle ordering
+     * used to restore the unshuffled queue, so it is left alone while shuffled.
+     */
+    fun move(from: Int, to: Int) {
+        if (from == to) return
+        if (!hasSongAt(from) || !hasSongAt(to)) return
+        val playing = currentQueue.getOrNull(currentSongIndex)
+        currentQueue.add(to, currentQueue.removeAt(from))
+        if (!currentShuffleMode && from < originalQueue.size && to < originalQueue.size) {
+            originalQueue.add(to, originalQueue.removeAt(from))
+        }
+        // Follow the playing song to its new position instead of holding the index.
+        playing?.let {
+            val index = currentQueue.indexOf(it)
+            if (index >= 0) {
+                currentSongIndex = index
+            }
+        }
+        symphony.radio.onUpdate.dispatch(Radio.Events.Queue.Modified)
+        symphony.radio.onUpdate.dispatch(Radio.Events.Queue.IndexChanged)
+    }
+
     fun remove(indices: List<Int>) {
         var deflection = 0
         var currentSongRemoved = false

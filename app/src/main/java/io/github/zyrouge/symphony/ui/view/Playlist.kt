@@ -130,6 +130,13 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
                         songIds = songIds,
                         type = SongListType.Playlist,
                         disableHeartIcon = isFavoritesPlaylist,
+                        // MAZIKA: drag the handle to reorder; persisted on release.
+                        onReorder = { orderedSongIds ->
+                            playlist?.let {
+                                context.symphony.groove.playlist.update(it.id, orderedSongIds)
+                                incrementUpdateCounter()
+                            }
+                        },
                         trailingOptionsContent = { _, song, onDismissRequest ->
                             playlist?.takeIf { it.isNotLocal }?.let {
                                 DropdownMenuItem(

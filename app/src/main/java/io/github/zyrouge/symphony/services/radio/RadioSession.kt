@@ -131,6 +131,23 @@ class RadioSession(val symphony: Symphony) {
                     playFromSearch(query)
                 }
 
+                // MAZIKA: seek buttons on the Android Auto playback screen, using the
+                // same durations as the phone's seek controls. Android Auto only shows
+                // custom actions on the full player - the dashboard/mini media card
+                // keeps the standard play-pause and next/previous controls.
+                override fun onCustomAction(action: String?, extras: Bundle?) {
+                    super.onCustomAction(action, extras)
+                    when (action) {
+                        ACTION_SEEK_BACK -> symphony.radio.shorty.seekFromCurrent(
+                            -symphony.settings.seekBackDuration.value
+                        )
+
+                        ACTION_SEEK_FORWARD -> symphony.radio.shorty.seekFromCurrent(
+                            symphony.settings.seekForwardDuration.value
+                        )
+                    }
+                }
+
                 override fun onRewind() {
                     super.onRewind()
                     val duration = symphony.settings.seekBackDuration.value
@@ -307,6 +324,20 @@ class RadioSession(val symphony: Symphony) {
                                 or PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
                                 or PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID
                     )
+                    addCustomAction(
+                        PlaybackStateCompat.CustomAction.Builder(
+                            ACTION_SEEK_BACK,
+                            symphony.t.XSecs("-${symphony.settings.seekBackDuration.value}"),
+                            R.drawable.material_icon_fast_rewind,
+                        ).build()
+                    )
+                    addCustomAction(
+                        PlaybackStateCompat.CustomAction.Builder(
+                            ACTION_SEEK_FORWARD,
+                            symphony.t.XSecs("+${symphony.settings.seekForwardDuration.value}"),
+                            R.drawable.material_icon_fast_forward,
+                        ).build()
+                    )
                     build()
                 }
             )
@@ -326,5 +357,9 @@ class RadioSession(val symphony: Symphony) {
         val ACTION_PREVIOUS = "${R.string.app_name}_previous"
         val ACTION_NEXT = "${R.string.app_name}_next"
         val ACTION_STOP = "${R.string.app_name}_stop"
+
+        // MAZIKA: custom transport actions surfaced on the Android Auto player.
+        const val ACTION_SEEK_BACK = "com.mazika.musicplayer.SEEK_BACK"
+        const val ACTION_SEEK_FORWARD = "com.mazika.musicplayer.SEEK_FORWARD"
     }
 }

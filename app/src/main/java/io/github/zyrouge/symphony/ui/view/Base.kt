@@ -19,6 +19,8 @@ import io.github.zyrouge.symphony.ui.helpers.ScaleTransition
 import io.github.zyrouge.symphony.ui.helpers.SlideTransition
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.theme.SymphonyTheme
+import io.github.zyrouge.symphony.ui.view.settings.AndroidAutoSettingsView
+import io.github.zyrouge.symphony.ui.view.settings.AndroidAutoSettingsViewRoute
 import io.github.zyrouge.symphony.ui.view.settings.AppearanceSettingsView
 import io.github.zyrouge.symphony.ui.view.settings.AppearanceSettingsViewRoute
 import io.github.zyrouge.symphony.ui.view.settings.GrooveSettingsView
@@ -88,6 +90,9 @@ fun BaseView(symphony: Symphony, activity: MainActivity) {
                 }
                 baseComposable<AppearanceSettingsViewRoute> {
                     AppearanceSettingsView(context)
+                }
+                baseComposable<AndroidAutoSettingsViewRoute> {
+                    AndroidAutoSettingsView(context)
                 }
                 baseComposable<GrooveSettingsViewRoute> {
                     GrooveSettingsView(context, it.toRoute())

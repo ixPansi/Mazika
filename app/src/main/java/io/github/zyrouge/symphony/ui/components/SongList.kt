@@ -19,6 +19,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,6 +58,14 @@ fun SongList(
     type: SongListType = SongListType.Default,
     disableHeartIcon: Boolean = false,
     enableAddMediaFoldersHint: Boolean = false,
+    /**
+     * MAZIKA: when supplied, rows get a drag handle and can be reordered. Called once
+     * on release with the new full ordering. Reordering is only offered while the list
+     * is on its Custom sort - any other sort is derived, so a manual order would be
+     * discarded on the next recomposition. Requires [leadingContent] to be null, since
+     * extra leading items would offset the lazy-list indices the drag maths relies on.
+     */
+    onReorder: ((List<String>) -> Unit)? = null,
 ) {
     val sortBy by type.getLastUsedSortBy(context).flow.collectAsState()
     val sortReverse by type.getLastUsedSortReverse(context).flow.collectAsState()
@@ -108,6 +125,29 @@ fun SongList(
 
                 else -> {
                     val lazyListState = rememberLazyListState()
+                    val coroutineScope = rememberCoroutineScope()
+                    val canReorder = onReorder != null &&
+                            leadingContent == null &&
+                            sortBy == SongRepository.SortBy.CUSTOM
+                    val localOrder = remember { mutableStateListOf<String>() }
+                    LaunchedEffect(sortedSongIds) {
+                        localOrder.clear()
+                        localOrder.addAll(sortedSongIds)
+                    }
+                    val displayedSongIds = when {
+                        canReorder -> localOrder
+                        else -> sortedSongIds
+                    }
+                    val reorderState = rememberReorderableState(
+                        listState = lazyListState,
+                        coroutineScope = coroutineScope,
+                        onMove = { from, to ->
+                            if (from in localOrder.indices && to in localOrder.indices) {
+                                localOrder.add(to, localOrder.removeAt(from))
+                            }
+                        },
+                        onSettle = { onReorder?.invoke(localOrder.toList()) },
+                    )
 
                     LazyColumn(
                         state = lazyListState,
@@ -115,27 +155,51 @@ fun SongList(
                     ) {
                         leadingContent?.invoke(this)
                         itemsIndexed(
-                            sortedSongIds,
+                            displayedSongIds,
                             key = { i, x -> "$i-$x" },
                             contentType = { _, _ -> Groove.Kind.SONG }
                         ) { i, songId ->
                             context.symphony.groove.song.get(songId)?.let { song ->
-                                SongCard(
-                                    context,
-                                    song = song,
-                                    thumbnailLabel = cardThumbnailLabel?.let {
-                                        { it(i, song) }
-                                    },
-                                    thumbnailLabelStyle = cardThumbnailLabelStyle,
-                                    disableHeartIcon = disableHeartIcon,
-                                    trailingOptionsContent = trailingOptionsContent?.let {
-                                        { onDismissRequest -> it(i, song, onDismissRequest) }
-                                    },
+                                Box(
+                                    modifier = Modifier
+                                        .zIndex(if (reorderState.draggingIndex == i) 1f else 0f)
+                                        .graphicsLayer {
+                                            if (reorderState.draggingIndex == i) {
+                                                translationY = reorderState.draggingOffset
+                                                shadowElevation = 8f
+                                            }
+                                        }
                                 ) {
-                                    context.symphony.radio.shorty.playQueue(
-                                        sortedSongIds,
-                                        Radio.PlayOptions(index = i)
-                                    )
+                                    SongCard(
+                                        context,
+                                        song = song,
+                                        leading = {
+                                            if (canReorder) {
+                                                Icon(
+                                                    Icons.Filled.DragIndicator,
+                                                    context.symphony.t.Reorder,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier
+                                                        .size(20.dp)
+                                                        .reorderableHandle(reorderState, i),
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                            }
+                                        },
+                                        thumbnailLabel = cardThumbnailLabel?.let {
+                                            { it(i, song) }
+                                        },
+                                        thumbnailLabelStyle = cardThumbnailLabelStyle,
+                                        disableHeartIcon = disableHeartIcon,
+                                        trailingOptionsContent = trailingOptionsContent?.let {
+                                            { onDismissRequest -> it(i, song, onDismissRequest) }
+                                        },
+                                    ) {
+                                        context.symphony.radio.shorty.playQueue(
+                                            displayedSongIds,
+                                            Radio.PlayOptions(index = i)
+                                        )
+                                    }
                                 }
                             }
                         }

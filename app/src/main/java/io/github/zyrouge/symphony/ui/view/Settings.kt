@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -55,6 +56,7 @@ import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
 import io.github.zyrouge.symphony.ui.components.settings.ConsiderContributingTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSimpleTile
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
+import io.github.zyrouge.symphony.ui.view.settings.AndroidAutoSettingsViewRoute
 import io.github.zyrouge.symphony.ui.view.settings.AppearanceSettingsViewRoute
 import io.github.zyrouge.symphony.ui.view.settings.GrooveSettingsViewRoute
 import io.github.zyrouge.symphony.ui.view.settings.HomePageSettingsViewRoute
@@ -229,6 +231,18 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
                         },
                         onClick = {
                             context.navController.navigate(HomePageSettingsViewRoute)
+                        }
+                    )
+                    HorizontalDivider()
+                    SettingsSimpleTile(
+                        icon = {
+                            Icon(Icons.Filled.DirectionsCar, null)
+                        },
+                        title = {
+                            Text(context.symphony.t.AndroidAuto)
+                        },
+                        onClick = {
+                            context.navController.navigate(AndroidAutoSettingsViewRoute)
                         },
                     )
                     HorizontalDivider()

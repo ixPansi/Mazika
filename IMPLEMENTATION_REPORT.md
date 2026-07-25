@@ -158,8 +158,8 @@ test failures introduced by this work.
 
 ### Release (signed) - the shipping build
 - Path: `artifacts/MAZIKA.apk` (copy of `app-universal-release.apk`)
-- Size: **14,264,109 bytes** (R8-minified; ABI splits are ~9 MB each)
-- SHA-256: `bd40e3e8bc6a6bbecc500c3647202abd26a749b5081c8f01452bb5b5e6581674`
+- Size: **14,275,000 bytes (approx)** (R8-minified; ABI splits are ~9 MB each)
+- SHA-256: `7b5331b1c40d1e546097286a2f4483703c981171705ebcfda6fec71aa2066fc1`
 - Application id: `com.mazika.musicplayer` - label `MAZIKA`
 - Version: `2024.12.115` (versionCode 115)
 - Min Android: 9 (API 28); target API 34

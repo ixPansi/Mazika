@@ -18,13 +18,14 @@ import io.github.zyrouge.symphony.utils.SimplePath
 class RadioBrowser(private val symphony: Symphony) {
     private val context get() = symphony.applicationContext
 
-    fun rootChildren(): List<MediaItem> = buildList {
-        add(category(MediaId.CATEGORY_SONGS, symphony.t.Songs))
-        add(category(MediaId.CATEGORY_ALBUMS, symphony.t.Albums))
-        add(category(MediaId.CATEGORY_ARTISTS, symphony.t.Artists))
-        add(category(MediaId.CATEGORY_PLAYLISTS, symphony.t.Playlists))
-        add(category(MediaId.CATEGORY_GENRES, symphony.t.Genres))
-        add(category(MediaId.CATEGORY_FOLDERS, symphony.t.Folders))
+    // MAZIKA: the root screen follows the user's configured category order
+    // (Settings -> Android Auto), falling back to the default order if they have
+    // somehow disabled everything - an empty root would look like a broken app.
+    fun rootChildren(): List<MediaItem> {
+        val categories = symphony.settings.androidAutoCategories.value
+            .takeIf { it.isNotEmpty() }
+            ?: AndroidAutoCategory.Default
+        return categories.map { category(it.mediaId, it.label(symphony)) }
     }
 
     fun getChildren(parentMediaId: String): List<MediaItem> = when (parentMediaId) {
