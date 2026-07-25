@@ -91,6 +91,23 @@ class ReorderableState internal constructor(
      * handle does not trigger a pointless persist. */
     private var moved = false
 
+    /**
+     * Height of the dragged row, remembered from the last frame its slot was measured.
+     *
+     * A `LazyColumn` only reports items whose slot is inside the viewport, so at the very
+     * top or bottom of a drag the dragged row can briefly vanish from `layoutInfo`. The
+     * clamp below needs its height in exactly those frames, which is why it is kept here
+     * rather than read live.
+     */
+    private var draggedSize = 0
+
+    /**
+     * Last offset computed while the row's slot was measurable. [draggingOffset] falls
+     * back to this instead of zero: zero means "sitting in its own slot", and if the slot
+     * has scrolled off screen that reads as the row vanishing mid-drag.
+     */
+    private var lastGoodOffset by mutableFloatStateOf(0f)
+
     private fun lazyIndexOf(dataIndex: Int) = firstItemIndex() + dataIndex
 
     private fun itemInfoAt(dataIndex: Int): LazyListItemInfo? {
@@ -106,22 +123,49 @@ class ReorderableState internal constructor(
      * always correct against the current layout.
      */
     val draggingOffset: Float
-        get() = draggingItem?.let { initialOffset + dragged - it.offset } ?: 0f
+        get() = draggingItem?.let { initialOffset + dragged - it.offset } ?: lastGoodOffset
 
     internal fun onDragStart(dataIndex: Int) {
         if (dataIndex !in 0 until itemCount()) return
         val item = itemInfoAt(dataIndex)
         draggingIndex = dataIndex
         initialOffset = item?.offset ?: 0
+        draggedSize = item?.size ?: 0
         dragged = 0f
+        lastGoodOffset = 0f
         scrollDirection = 0
         moved = false
     }
 
     internal fun onDrag(delta: Float) {
         dragged += delta
+        clampToViewport()
         recheckTarget()
         updateScrollDirection()
+    }
+
+    /**
+     * Keeps the dragged row inside the visible area.
+     *
+     * Without this the row can be pushed past either end of the viewport. Its *slot*
+     * follows it out, the `LazyColumn` disposes anything whose slot is off screen, and
+     * the row simply stops being drawn — which is what "it disappears when I go too high
+     * or too low" is. Clamping the travel means the row always has somewhere visible to
+     * be, and the finger can move past the edge without dragging the row out with it.
+     *
+     * Auto-scroll still engages, because it triggers on a band *inside* the viewport
+     * rather than on the row overshooting it.
+     */
+    private fun clampToViewport() {
+        val info = listState.layoutInfo
+        val size = draggingItem?.size?.also { draggedSize = it } ?: draggedSize
+        val min = (info.viewportStartOffset - initialOffset).toFloat()
+        val max = (info.viewportEndOffset - size - initialOffset).toFloat()
+        if (max < min) {
+            // Viewport shorter than one row; nothing sensible to clamp to.
+            return
+        }
+        dragged = dragged.coerceIn(min, max)
     }
 
     internal fun onDragEnd() {
@@ -146,9 +190,12 @@ class ReorderableState internal constructor(
      */
     internal fun recheckTarget() {
         val current = draggingItem ?: return
+        draggedSize = current.size
 
         // Where the dragged row actually is on screen right now.
-        val start = current.offset + draggingOffset
+        val offset = initialOffset + dragged - current.offset
+        lastGoodOffset = offset
+        val start = current.offset + offset
         val middle = start + current.size / 2f
 
         // A move triggers when the dragged row's midpoint crosses into another row,
@@ -175,7 +222,13 @@ class ReorderableState internal constructor(
      * direction can engage earlier or run further than the other.
      */
     internal fun updateScrollDirection() {
-        val current = draggingItem ?: return
+        // No measurable slot means the row is momentarily off screen. Stop scrolling
+        // rather than leaving the previous direction running, which would carry it
+        // further away and keep it there.
+        val current = draggingItem ?: run {
+            scrollDirection = 0
+            return
+        }
         val info = listState.layoutInfo
         val start = current.offset + draggingOffset
         val end = start + current.size
@@ -190,6 +243,12 @@ class ReorderableState internal constructor(
     /** Called by the loop when the list refused to move, so it stops pushing. */
     internal fun onScrollExhausted() {
         scrollDirection = 0
+    }
+
+    /** Re-applies the viewport clamp from the scroll loop, where the row's slot moves
+     * without the finger having moved at all. */
+    internal fun clampAndRecover() {
+        clampToViewport()
     }
 }
 
@@ -278,10 +337,14 @@ fun rememberReorderableState(
             // twice the rate of a 60Hz one for the same code.
             val consumed = listState.scrollBy(direction * speedPxPerSecond * elapsed)
             if (abs(consumed) < 0.5f) {
-                // The list is already at an end; stop pushing against it.
+                // The list is already at an end; stop pushing against it. Re-clamp
+                // first, in case the row had drifted past the edge on the way here.
+                state.clampAndRecover()
                 state.onScrollExhausted()
             } else {
-                // Keep swapping rows as the list moves under a stationary finger.
+                // Keep swapping rows as the list moves under a stationary finger, and
+                // re-clamp: the row's slot has just moved relative to the viewport.
+                state.clampAndRecover()
                 state.recheckTarget()
             }
         }

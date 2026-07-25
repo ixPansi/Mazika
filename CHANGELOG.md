@@ -30,6 +30,13 @@
   pushing once the list reaches an end instead of grinding against it.
 - The drop-target test used an inclusive range, so a row landing exactly on a boundary
   matched two rows and always resolved upwards.
+- **A row being dragged no longer vanishes at the top or bottom of the list.** Nothing
+  stopped it being pushed past either end of the viewport; its slot went out with it,
+  and a `LazyColumn` disposes anything whose slot is off screen, so the row simply
+  stopped being drawn. Travel is now clamped to the visible area — the finger can still
+  move past the edge, the row just stays where it can be seen — and the drawn offset
+  falls back to its last measured value instead of collapsing to zero on the frames
+  where the slot is unmeasurable.
 - Reordered rows keep their identity when the list is rebuilt from the persisted
   order, so a drag no longer ends in a visible rebuild of the list.
 - Releasing a drag that moved nothing no longer persists or rewrites the queue.
