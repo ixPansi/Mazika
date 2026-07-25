@@ -94,5 +94,15 @@ class ArtworkProvider : ContentProvider() {
         fun playlistCoverUri(context: Context, name: String): Uri = Uri.parse(
             "content://${authority(context)}/$SEGMENT_PLAYLIST_COVERS/${MediaId.encode(name)}"
         )
+
+        /**
+         * The directory roots artwork can live under, for granting a browser client
+         * prefix read access in one call per directory instead of one per image.
+         */
+        fun artworkRootUris(context: Context): List<Uri> = listOf(
+            SEGMENT_COVERS,
+            SEGMENT_SONG_COVERS,
+            SEGMENT_PLAYLIST_COVERS,
+        ).map { Uri.parse("content://${authority(context)}/$it") }
     }
 }

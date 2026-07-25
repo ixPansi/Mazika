@@ -89,14 +89,35 @@ checklist as Method 1 — plus:
 - Locking the phone must **not** stop playback.
 - Disconnecting (close DHU) must not corrupt playback state — the phone keeps playing.
 - Pause/resume from the car UI must honour the **Fade on pause and resume** setting.
-- Confirm **no lyrics** are shown on the car screen (driver-distraction rule).
-- The playback screen shows **seek back / seek forward** buttons using the same
-  durations as the phone (Settings -> Player). These are media-session *custom
-  actions*, so they appear on the full player only - Android Auto's dashboard media
-  card next to the map keeps just play/pause and next/previous, which is the intended
-  driver-safe behaviour.
+- The playback screen shows **seek back / seek forward** and **Lyrics** buttons. These
+  are media-session *custom actions*, so they appear on the full player only - Android
+  Auto's dashboard media card next to the map keeps just play/pause and
+  next/previous, which is the intended driver-safe behaviour.
+- The **Queue** category is first, so the pane you land on when you swipe away from the
+  player is the queue rather than the song list. Entries show cover art and jump to
+  that position when tapped. The native **Queue** button on the player shows the same
+  thing with artwork.
 - The root screen order follows **Settings -> Android Auto** on the phone, so you can
   put Playlists (or anything else) first.
+
+### Lyrics in the car
+
+Android Auto media apps cannot draw a custom screen — the template gives you a browse
+list and a playback screen and nothing else — so a player button cannot open a lyrics
+page. MAZIKA takes the two shapes that *are* expressible:
+
+- The **Lyrics button on the player** puts the current lyric line where the artist name
+  normally sits and keeps it in step with playback. One line at a time, which is the
+  least distracting form this can take. It needs timed (`.lrc`) lyrics; for untimed
+  lyrics the artist line is left alone.
+- The **Lyrics browse category** lists the playing song's full lyrics as rows, which
+  works for untimed lyrics too. Tapping a timed line seeks to it.
+
+Two things to be aware of. The lyric line is published as session metadata, which every
+controller reads — so the **lock screen shows it too** while the toggle is on. It is off
+by default and resets when playback stops. And the browse category is a scrollable wall
+of text, which is exactly what Android Auto's driver-distraction guidance warns about;
+it is listed last by default and can be switched off in **Settings -> Android Auto**.
 
 Useful DHU keys: `?` for help, and you can simulate driving with the day/night and
 distraction-mode toggles.

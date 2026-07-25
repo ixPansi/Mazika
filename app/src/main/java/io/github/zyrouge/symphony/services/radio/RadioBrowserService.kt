@@ -2,10 +2,13 @@ package io.github.zyrouge.symphony.services.radio
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import androidx.media.MediaBrowserServiceCompat
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.SymphonyProvider
+import io.github.zyrouge.symphony.utils.EventUnsubscribeFn
 import io.github.zyrouge.symphony.utils.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,6 +25,8 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
     private lateinit var symphony: Symphony
     private lateinit var browser: RadioBrowser
     private var clientPackageName: String? = null
+    private var unsubscribeRadio: EventUnsubscribeFn? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -36,9 +41,43 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
             symphony = SymphonyProvider.get(application)
             browser = RadioBrowser(symphony)
             sessionToken = symphony.radio.session.mediaSession.sessionToken
+            // The Queue and Lyrics categories mirror live state, so the browser has to
+            // be told when they go stale - otherwise the car keeps showing the queue as
+            // it was when the pane was first opened.
+            unsubscribeRadio = symphony.radio.onUpdate.subscribe { event ->
+                when (event) {
+                    is Radio.Events.Queue -> notifyChildrenChangedOnMain(MediaId.CATEGORY_QUEUE)
+                    // Only a song change invalidates the lyrics - not a pause, and
+                    // certainly not a seek, which is what tapping a lyric line does.
+                    Radio.Events.Player.Staged,
+                    Radio.Events.Player.Started,
+                    Radio.Events.Player.Ended,
+                        -> notifyChildrenChangedOnMain(MediaId.CATEGORY_LYRICS)
+
+                    else -> {}
+                }
+            }
         } catch (err: Throwable) {
             Logger.error("RadioBrowserService", "initialisation failed", err)
             stopSelf()
+        }
+    }
+
+    override fun onDestroy() {
+        unsubscribeRadio?.invoke()
+        unsubscribeRadio = null
+        mainHandler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
+    /** [notifyChildrenChanged] is main-thread only; radio events arrive from anywhere. */
+    private fun notifyChildrenChangedOnMain(parentId: String) {
+        mainHandler.post {
+            try {
+                notifyChildrenChanged(parentId)
+            } catch (err: Exception) {
+                Logger.warn("RadioBrowserService", "notifyChildrenChanged($parentId): $err")
+            }
         }
     }
 
@@ -57,6 +96,9 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         rootHints: Bundle?,
     ): BrowserRoot {
         this.clientPackageName = clientPackageName
+        // Queue artwork is published through the media session rather than through this
+        // service, so RadioSession needs to know who to grant read access to.
+        symphony.radio.session.browserClientPackage = clientPackageName
         return BrowserRoot(MediaId.ROOT, null)
     }
 

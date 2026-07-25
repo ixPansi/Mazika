@@ -25,9 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -125,7 +122,6 @@ fun SongList(
 
                 else -> {
                     val lazyListState = rememberLazyListState()
-                    val coroutineScope = rememberCoroutineScope()
                     val canReorder = onReorder != null &&
                             leadingContent == null &&
                             sortBy == SongRepository.SortBy.CUSTOM
@@ -140,7 +136,7 @@ fun SongList(
                     }
                     val reorderState = rememberReorderableState(
                         listState = lazyListState,
-                        coroutineScope = coroutineScope,
+                        itemCount = { if (canReorder) localOrder.size else 0 },
                         onMove = { from, to ->
                             if (from in localOrder.indices && to in localOrder.indices) {
                                 localOrder.add(to, localOrder.removeAt(from))
@@ -161,14 +157,11 @@ fun SongList(
                         ) { i, entry ->
                             context.symphony.groove.song.get(entry.value)?.let { song ->
                                 Box(
-                                    modifier = Modifier
-                                        .zIndex(if (reorderState.draggingIndex == i) 1f else 0f)
-                                        .graphicsLayer {
-                                            if (reorderState.draggingIndex == i) {
-                                                translationY = reorderState.draggingOffset
-                                                shadowElevation = 8f
-                                            }
-                                        }
+                                    modifier = reorderableItemModifier(
+                                        reorderState,
+                                        i,
+                                        enabled = canReorder,
+                                    )
                                 ) {
                                     SongCard(
                                         context,

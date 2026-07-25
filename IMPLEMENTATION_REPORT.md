@@ -97,12 +97,22 @@
   voice search) as a no-UI trampoline delegating to the same `RadioSession.playFromSearch`.
 - `ArtworkProvider` — read-only, non-exported content provider; the browser service
   grants per-uri read to the connecting client so covers/artwork render in the car.
+  Media-session queue items never pass through the browser service, so `RadioSession`
+  grants the connected client prefix read on the artwork directories instead — two
+  grants rather than one per queue entry, still read-only and still path-validated.
 - Manifest: exported browser service with the `MediaBrowserService` intent filter,
   `res/xml/automotive_app_desc.xml` (`uses media`), and the car application meta-data
   declared with **`android:resource`** (not `android:value` - Android Auto resolves
   that metadata as a resource id, and using `android:value` stops the app from ever
   appearing in the car app list).
-- No lyrics on the driving screen.
+- Lyrics on the driving screen: originally omitted on driver-distraction grounds, then
+  added at the user's explicit request after the constraint was put to them. Two forms,
+  because Android Auto media apps cannot draw a custom screen and so a player button
+  cannot open a lyrics page: a player custom action that swaps the current *single*
+  timed lyric line into the artist line, and a browsable Lyrics category carrying the
+  full text. The category is listed last and can be switched off; the toggle is off by
+  default and resets when playback stops. Caveat recorded in `ANDROID_AUTO_TESTING.md`:
+  the line is session metadata, so the lock screen shows it too while it is on.
 
 ### Rebranding
 - `app_name` → MAZIKA (main/debug/canary), `AppMeta.appName` → MAZIKA (upstream
@@ -151,19 +161,19 @@
 | `npm run prebuild` | success (i18n generated) |
 | `gradlew.bat assembleDebug` (untouched baseline) | BUILD SUCCESSFUL (6m 18s), 5 APKs |
 | `gradlew.bat assembleDebug` (MAZIKA) | BUILD SUCCESSFUL |
-| `gradlew.bat testDebugUnitTest` | **16 tests, 0 failures** (MediaId 4, PlaybackFade 4, SwipeDirection 5, PlaylistCovers 3) |
+| `gradlew.bat testDebugUnitTest` | **22 tests, 0 failures** (MediaId 4, PlaybackFade 4, SwipeDirection 5, CustomCovers 3, PlaylistCoverCrop 6) |
 | `gradlew.bat assembleRelease` | BUILD SUCCESSFUL — unsigned release APKs (R8) |
 | `gradlew.bat lintDebug` | BUILD SUCCESSFUL — 0 errors, 73 warnings (see below) |
 
-No pre-existing tests existed in `:app`; the 16 tests above are new. There were no
+No pre-existing tests existed in `:app`; the 22 tests above are new. There were no
 test failures introduced by this work.
 
 ## APK files
 
 ### Release (signed) - the shipping build
 - Path: `artifacts/MAZIKA.apk` (copy of `app-universal-release.apk`)
-- Size: **14,299,746 bytes** (R8-minified; ABI splits are ~9 MB each)
-- SHA-256: `872d207ab7e6a8062f37b140ef861f5709a8810598bb546b940e391bcff705f1`
+- Size: **14,300,438 bytes** (R8-minified; ABI splits are ~9 MB each)
+- SHA-256: `15dc5890ea3dcde4592eb179d971b1c306cfb81445646250ed3d9b08b30a1735`
 - Application id: `com.mazika.musicplayer` - label `MAZIKA`
 - Version: `2024.12.115` (versionCode 115)
 - Min Android: 9 (API 28); target API 34

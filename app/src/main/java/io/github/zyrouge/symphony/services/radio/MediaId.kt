@@ -14,12 +14,14 @@ object MediaId {
     const val ROOT = "root"
 
     // Category (browsable) roots.
+    const val CATEGORY_QUEUE = "category:queue"
     const val CATEGORY_SONGS = "category:songs"
     const val CATEGORY_ALBUMS = "category:albums"
     const val CATEGORY_ARTISTS = "category:artists"
     const val CATEGORY_PLAYLISTS = "category:playlists"
     const val CATEGORY_GENRES = "category:genres"
     const val CATEGORY_FOLDERS = "category:folders"
+    const val CATEGORY_LYRICS = "category:lyrics"
 
     // Item types.
     const val TYPE_SONG = "song"
@@ -28,6 +30,12 @@ object MediaId {
     const val TYPE_PLAYLIST = "playlist"
     const val TYPE_GENRE = "genre"
     const val TYPE_FOLDER = "folder"
+
+    /** A position in the live play queue - the id is the queue index. */
+    const val TYPE_QUEUE_ITEM = "queueitem"
+
+    /** A single lyric line - the id is its start time in milliseconds, or -1 if untimed. */
+    const val TYPE_LYRICS_LINE = "lyricsline"
 
     // Context types (how a played song builds its queue).
     const val CONTEXT_ALL = "all"

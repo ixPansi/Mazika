@@ -7,6 +7,7 @@ import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.services.groove.Playlist
 import io.github.zyrouge.symphony.utils.SimpleFileSystem
 import io.github.zyrouge.symphony.utils.SimplePath
+import io.github.zyrouge.symphony.utils.TimedContent
 
 /**
  * MAZIKA: builds the Android Auto browse tree and resolves browse/search actions
@@ -28,8 +29,10 @@ class RadioBrowser(private val symphony: Symphony) {
         return categories.map { category(it.mediaId, it.label(symphony)) }
     }
 
-    fun getChildren(parentMediaId: String): List<MediaItem> = when (parentMediaId) {
+    suspend fun getChildren(parentMediaId: String): List<MediaItem> = when (parentMediaId) {
         MediaId.ROOT -> rootChildren()
+        MediaId.CATEGORY_QUEUE -> queueChildren()
+        MediaId.CATEGORY_LYRICS -> lyricsChildren()
         MediaId.CATEGORY_SONGS ->
             allSongIdsSorted().take(MAX_CHILDREN).mapNotNull {
                 songItem(it, MediaId.CONTEXT_ALL, null)
@@ -73,11 +76,86 @@ class RadioBrowser(private val symphony: Symphony) {
         }
     }
 
+    // --- queue ------------------------------------------------------------------
+
+    /**
+     * The live play queue, so the car can see and jump around what is actually queued.
+     * Ids carry the queue index rather than a song id, because the same song can be
+     * queued more than once and tapping must jump to the entry that was tapped.
+     */
+    private fun queueChildren(): List<MediaItem> = symphony.radio.queue.currentQueue
+        .take(MAX_CHILDREN)
+        .mapIndexedNotNull { index, songId ->
+            val song = symphony.groove.song.get(songId) ?: return@mapIndexedNotNull null
+            val description = MediaDescriptionCompat.Builder()
+                .setMediaId(MediaId.of(MediaId.TYPE_QUEUE_ITEM, index.toString()))
+                .setTitle(song.title)
+                .setSubtitle(song.artists.joinToString().ifEmpty { null })
+                .apply { songArtworkUri(song.id, song.coverFile)?.let { setIconUri(it) } }
+                .build()
+            MediaItem(description, MediaItem.FLAG_PLAYABLE)
+        }
+
+    // --- lyrics -----------------------------------------------------------------
+
+    /**
+     * The playing song's lyrics, one line per row.
+     *
+     * Android Auto media apps cannot draw a custom screen, so a list of rows is the
+     * only way to show a full lyric sheet in the car. Rows are marked playable so the
+     * host renders them as tappable; [playFromMediaId] turns a tap into a seek when the
+     * lyrics are timed, and ignores it otherwise.
+     */
+    private suspend fun lyricsChildren(): List<MediaItem> {
+        val song = symphony.radio.queue.currentSongId?.let { symphony.groove.song.get(it) }
+            ?: return listOf(lyricsPlaceholder(symphony.t.NoLyrics))
+        val content = symphony.groove.song.getLyrics(song)?.takeIf { it.isNotBlank() }
+            ?: return listOf(lyricsPlaceholder(symphony.t.NoLyrics))
+        val timed = TimedContent.fromLyrics(content)
+        val synced = timed.isSynced
+        val lines = timed.pairs
+            .filter { it.second.isNotBlank() }
+            .take(MAX_CHILDREN)
+        if (lines.isEmpty()) {
+            return listOf(lyricsPlaceholder(symphony.t.NoLyrics))
+        }
+        return lines.map { (time, text) ->
+            val description = MediaDescriptionCompat.Builder()
+                .setMediaId(
+                    MediaId.of(
+                        MediaId.TYPE_LYRICS_LINE,
+                        (if (synced) time else -1L).toString(),
+                    )
+                )
+                .setTitle(text)
+                .build()
+            MediaItem(description, MediaItem.FLAG_PLAYABLE)
+        }
+    }
+
+    private fun lyricsPlaceholder(text: String) = MediaItem(
+        MediaDescriptionCompat.Builder()
+            .setMediaId(MediaId.of(MediaId.TYPE_LYRICS_LINE, "-1"))
+            .setTitle(text)
+            .build(),
+        MediaItem.FLAG_PLAYABLE,
+    )
+
     // --- playback ---------------------------------------------------------------
 
     fun playFromMediaId(mediaId: String) {
         val parsed = MediaId.parse(mediaId) ?: return
         when (parsed.type) {
+            // Jump to an existing queue position instead of building a new queue.
+            MediaId.TYPE_QUEUE_ITEM -> parsed.id.toIntOrNull()
+                ?.takeIf { symphony.radio.queue.hasSongAt(it) }
+                ?.let { symphony.radio.jumpTo(it) }
+
+            // Tapping a timed lyric line seeks to it; untimed lines carry -1 and do nothing.
+            MediaId.TYPE_LYRICS_LINE -> parsed.id.toLongOrNull()
+                ?.takeIf { it >= 0 }
+                ?.let { symphony.radio.seek(it) }
+
             MediaId.TYPE_SONG -> {
                 val queue = queueForContext(parsed.contextType, parsed.contextId)
                 val index = queue.indexOf(parsed.id).takeIf { it >= 0 } ?: 0
@@ -336,6 +414,16 @@ class RadioBrowser(private val symphony: Symphony) {
         symphony.groove.song.getCustomCoverFile(songId)
             ?.let { ArtworkProvider.songCoverUri(context, it) }
             ?: coversUri(coverFile)
+
+    /**
+     * Artwork for a song by id, using the same precedence as the browse tree. Shared
+     * with [RadioSession] so the media-session queue and the browse tree cannot drift
+     * apart on which cover a song shows.
+     */
+    internal fun artworkUriFor(songId: String): Uri? {
+        val song = symphony.groove.song.get(songId) ?: return null
+        return songArtworkUri(song.id, song.coverFile)
+    }
 
     private fun playlistIconUri(playlist: Playlist): Uri? {
         playlist.customCoverPath?.let {

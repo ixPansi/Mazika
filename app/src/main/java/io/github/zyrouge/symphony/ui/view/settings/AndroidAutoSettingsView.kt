@@ -31,18 +31,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import io.github.zyrouge.symphony.services.radio.AndroidAutoCategory
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
 import io.github.zyrouge.symphony.ui.components.rememberReorderableState
 import io.github.zyrouge.symphony.ui.components.reorderableHandle
+import io.github.zyrouge.symphony.ui.components.reorderableItemModifier
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSideHeading
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import kotlinx.serialization.Serializable
@@ -62,7 +60,6 @@ object AndroidAutoSettingsViewRoute
 fun AndroidAutoSettingsView(context: ViewContext) {
     val enabled by context.symphony.settings.androidAutoCategories.flow.collectAsState()
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
 
     // Local copy so dragging stays smooth; persisted once on release.
     val order = remember { mutableStateListOf<AndroidAutoCategory>() }
@@ -77,7 +74,9 @@ fun AndroidAutoSettingsView(context: ViewContext) {
     }
     val reorderState = rememberReorderableState(
         listState = listState,
-        coroutineScope = coroutineScope,
+        itemCount = { order.size },
+        // The list emits a heading item before the rows, so data index 0 is lazy index 1.
+        firstItemIndex = { 1 },
         onMove = { from, to ->
             if (from in order.indices && to in order.indices) {
                 order.add(to, order.removeAt(from))
@@ -128,16 +127,7 @@ fun AndroidAutoSettingsView(context: ViewContext) {
                         order,
                         key = { _, x -> "enabled-${x.name}" },
                     ) { i, category ->
-                        Box(
-                            modifier = Modifier
-                                .zIndex(if (reorderState.draggingIndex == i) 1f else 0f)
-                                .graphicsLayer {
-                                    if (reorderState.draggingIndex == i) {
-                                        translationY = reorderState.draggingOffset
-                                        shadowElevation = 8f
-                                    }
-                                }
-                        ) {
+                        Box(modifier = reorderableItemModifier(reorderState, i)) {
                             CategoryRow(
                                 label = category.label(context.symphony),
                                 checked = true,

@@ -364,8 +364,12 @@ class Settings(private val symphony: Symphony) {
         ImagePreserver.Quality.Medium,
     )
     // MAZIKA: which categories appear on the Android Auto root screen, in order.
+    // The key is versioned because a stored list cannot grow new entries on its own:
+    // installs that saved the pre-Queue/Lyrics order would never see the new
+    // categories. Bumping it re-applies the default once; a hand-made order set
+    // before that build is lost, which is the whole cost of the change.
     val androidAutoCategories = EnumListEntry(
-        "android_auto_categories",
+        "android_auto_categories_v2",
         enumEntries<AndroidAutoCategory>(),
         AndroidAutoCategory.Default,
     )

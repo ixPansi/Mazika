@@ -41,10 +41,9 @@ import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholderSize
 import io.github.zyrouge.symphony.ui.components.NewPlaylistDialog
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.zIndex
 import io.github.zyrouge.symphony.ui.components.rememberReorderableState
 import io.github.zyrouge.symphony.ui.components.reorderableHandle
+import io.github.zyrouge.symphony.ui.components.reorderableItemModifier
 import io.github.zyrouge.symphony.ui.components.ReorderableEntry
 import io.github.zyrouge.symphony.ui.components.toReorderableEntries
 import io.github.zyrouge.symphony.ui.components.SongCard
@@ -83,7 +82,7 @@ fun QueueView(context: ViewContext) {
     var pendingMove by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val reorderState = rememberReorderableState(
         listState = listState,
-        coroutineScope = coroutineScope,
+        itemCount = { reorderableQueue.size },
         onMove = { from, to ->
             if (from in reorderableQueue.indices && to in reorderableQueue.indices) {
                 reorderableQueue.add(to, reorderableQueue.removeAt(from))
@@ -174,16 +173,7 @@ fun QueueView(context: ViewContext) {
                             contentType = { _, _ -> Groove.Kind.SONG },
                         ) { i, entry ->
                             context.symphony.groove.song.get(entry.value)?.let { song ->
-                                Box(
-                                    modifier = Modifier
-                                        .zIndex(if (reorderState.draggingIndex == i) 1f else 0f)
-                                        .graphicsLayer {
-                                            if (reorderState.draggingIndex == i) {
-                                                translationY = reorderState.draggingOffset
-                                                shadowElevation = 8f
-                                            }
-                                        }
-                                ) {
+                                Box(modifier = reorderableItemModifier(reorderState, i)) {
                                     SongCard(
                                         context,
                                         song,
