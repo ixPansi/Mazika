@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.zyrouge.symphony.services.groove.Groove
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.services.groove.Song
 import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
 import io.github.zyrouge.symphony.services.radio.Radio
@@ -63,6 +64,12 @@ fun SongList(
      * extra leading items would offset the lazy-list indices the drag maths relies on.
      */
     onReorder: ((List<String>) -> Unit)? = null,
+    /**
+     * MAZIKA: what this list *is* — the album, artist or playlist it belongs to — so
+     * playing from it is recorded against that rather than against the track. Null on a
+     * plain library list, where the song itself is the only thing to record.
+     */
+    playSource: PlaySource? = null,
 ) {
     val sortBy by type.getLastUsedSortBy(context).flow.collectAsState()
     val sortReverse by type.getLastUsedSortReverse(context).flow.collectAsState()
@@ -90,7 +97,11 @@ fun SongList(
                     Text(context.symphony.t.XSongs((songsCount ?: songIds.size).toString()))
                 },
                 onShufflePlay = {
-                    context.symphony.radio.shorty.playQueue(sortedSongIds, shuffle = true)
+                    context.symphony.radio.shorty.playQueue(
+                        sortedSongIds,
+                        shuffle = true,
+                        source = playSource,
+                    )
                 }
             )
         },
@@ -159,7 +170,7 @@ fun SongList(
                                 Box(
                                     modifier = reorderableItemModifier(
                                         reorderState,
-                                        i,
+                                        entry.uid,
                                         enabled = canReorder,
                                     )
                                 ) {
@@ -174,7 +185,7 @@ fun SongList(
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier
                                                         .size(20.dp)
-                                                        .reorderableHandle(reorderState, i),
+                                                        .reorderableHandle(reorderState, entry.uid),
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
                                             }
@@ -190,7 +201,10 @@ fun SongList(
                                     ) {
                                         context.symphony.radio.shorty.playQueue(
                                             displayedEntries.map { it.value },
-                                            Radio.PlayOptions(index = i)
+                                            Radio.PlayOptions(index = i),
+                                            // Falls back to the song itself when the
+                                            // list is not part of a larger thing.
+                                            source = playSource ?: PlaySource.song(song.path),
                                         )
                                     }
                                 }

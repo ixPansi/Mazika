@@ -1,6 +1,7 @@
 package io.github.zyrouge.symphony.services.radio
 
 import io.github.zyrouge.symphony.Symphony
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import kotlin.random.Random
 
 class RadioShorty(private val symphony: Symphony) {
@@ -54,15 +55,23 @@ class RadioShorty(private val symphony: Symphony) {
         }
     }
 
+    /**
+     * [source] is what the user actually tapped — the album, playlist, artist or folder
+     * the queue came from. It is the only place that knows, because everything below
+     * this point deals in bare song ids, and it is what "recently played" is built on.
+     * Null means the caller has no larger thing to point at.
+     */
     fun playQueue(
         songIds: List<String>,
         options: Radio.PlayOptions = Radio.PlayOptions(),
         shuffle: Boolean = false,
+        source: PlaySource? = null,
     ) {
         symphony.radio.stop(ended = false)
         if (songIds.isEmpty()) {
             return
         }
+        symphony.groove.playHistory.onPlayQueue(source)
         symphony.radio.queue.add(
             songIds,
             options = options.run {
@@ -76,5 +85,6 @@ class RadioShorty(private val symphony: Symphony) {
         songId: String,
         options: Radio.PlayOptions = Radio.PlayOptions(),
         shuffle: Boolean = false,
-    ) = playQueue(listOf(songId), options = options, shuffle = shuffle)
+        source: PlaySource? = null,
+    ) = playQueue(listOf(songId), options = options, shuffle = shuffle, source = source)
 }

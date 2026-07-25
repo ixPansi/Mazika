@@ -49,6 +49,13 @@ import kotlinx.serialization.Serializable
 object AndroidAutoSettingsViewRoute
 
 /**
+ * Lazy-list key for an enabled category row. Shared by the `key =` lambda and the
+ * reorder modifiers so the two cannot disagree about a row's identity — which is what
+ * the drag now tracks rows by.
+ */
+private fun enabledRowKey(category: AndroidAutoCategory) = "enabled-${category.name}"
+
+/**
  * MAZIKA: chooses which categories appear on the Android Auto root screen and in what
  * order, so the first thing shown in the car can be Playlists rather than Songs.
  *
@@ -125,9 +132,10 @@ fun AndroidAutoSettingsView(context: ViewContext) {
                     }
                     itemsIndexed(
                         order,
-                        key = { _, x -> "enabled-${x.name}" },
-                    ) { i, category ->
-                        Box(modifier = reorderableItemModifier(reorderState, i)) {
+                        key = { _, x -> enabledRowKey(x) },
+                    ) { _, category ->
+                        val rowKey = enabledRowKey(category)
+                        Box(modifier = reorderableItemModifier(reorderState, rowKey)) {
                             CategoryRow(
                                 label = category.label(context.symphony),
                                 checked = true,
@@ -141,7 +149,7 @@ fun AndroidAutoSettingsView(context: ViewContext) {
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier
                                             .size(20.dp)
-                                            .reorderableHandle(reorderState, i),
+                                            .reorderableHandle(reorderState, rowKey),
                                     )
                                 },
                                 onCheckedChange = {

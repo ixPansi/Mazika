@@ -4,6 +4,7 @@ import android.net.Uri
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import io.github.zyrouge.symphony.Symphony
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.services.groove.Playlist
 import io.github.zyrouge.symphony.utils.SimpleFileSystem
 import io.github.zyrouge.symphony.utils.SimplePath
@@ -82,17 +83,46 @@ class RadioBrowser(private val symphony: Symphony) {
                 val queue = queueForContext(parsed.contextType, parsed.contextId)
                 val index = queue.indexOf(parsed.id).takeIf { it >= 0 } ?: 0
                 val finalQueue = queue.ifEmpty { listOf(parsed.id) }
-                symphony.radio.shorty.playQueue(finalQueue, Radio.PlayOptions(index = index))
+                symphony.radio.shorty.playQueue(
+                    finalQueue,
+                    Radio.PlayOptions(index = index),
+                    // The media id already carries what the song was browsed from, so
+                    // playing in the car feeds the same history as playing on the phone.
+                    source = sourceFor(parsed.contextType, parsed.contextId)
+                        ?: symphony.groove.song.get(parsed.id)?.path?.let { PlaySource.song(it) },
+                )
             }
 
-            MediaId.TYPE_ALBUM -> playSongs(albumSongIdsSorted(parsed.id))
-            MediaId.TYPE_ARTIST -> playSongs(artistSongIdsSorted(parsed.id))
-            MediaId.TYPE_PLAYLIST ->
-                playSongs(symphony.groove.playlist.get(parsed.id)?.getSortedSongIds(symphony) ?: emptyList())
+            MediaId.TYPE_ALBUM ->
+                playSongs(albumSongIdsSorted(parsed.id), PlaySource.album(parsed.id))
 
-            MediaId.TYPE_GENRE -> playSongs(genreSongIdsSorted(parsed.id))
-            MediaId.TYPE_FOLDER -> playSongs(folderSongIds(parsed.id))
+            MediaId.TYPE_ARTIST ->
+                playSongs(artistSongIdsSorted(parsed.id), PlaySource.artist(parsed.id))
+
+            MediaId.TYPE_PLAYLIST -> playSongs(
+                symphony.groove.playlist.get(parsed.id)?.getSortedSongIds(symphony) ?: emptyList(),
+                PlaySource.playlist(parsed.id),
+            )
+
+            MediaId.TYPE_GENRE ->
+                playSongs(genreSongIdsSorted(parsed.id), PlaySource.genre(parsed.id))
+
+            MediaId.TYPE_FOLDER ->
+                playSongs(folderSongIds(parsed.id), PlaySource.folder(parsed.id))
+
             else -> {}
+        }
+    }
+
+    private fun sourceFor(contextType: String?, contextId: String?): PlaySource? {
+        val id = contextId ?: return null
+        return when (contextType) {
+            MediaId.TYPE_ALBUM -> PlaySource.album(id)
+            MediaId.TYPE_ARTIST -> PlaySource.artist(id)
+            MediaId.TYPE_PLAYLIST -> PlaySource.playlist(id)
+            MediaId.TYPE_GENRE -> PlaySource.genre(id)
+            MediaId.TYPE_FOLDER -> PlaySource.folder(id)
+            else -> null
         }
     }
 
@@ -152,9 +182,9 @@ class RadioBrowser(private val symphony: Symphony) {
         return items
     }
 
-    private fun playSongs(songIds: List<String>) {
+    private fun playSongs(songIds: List<String>, source: PlaySource? = null) {
         if (songIds.isEmpty()) return
-        symphony.radio.shorty.playQueue(songIds)
+        symphony.radio.shorty.playQueue(songIds, source = source)
     }
 
     private fun queueForContext(contextType: String?, contextId: String?): List<String> =

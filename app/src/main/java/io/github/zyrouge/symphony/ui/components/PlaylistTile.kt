@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import io.github.zyrouge.symphony.services.groove.MediaExposer
 import io.github.zyrouge.symphony.services.groove.Playlist
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.theme.ThemeColors
 import io.github.zyrouge.symphony.ui.view.PlaylistViewRoute
@@ -131,7 +132,8 @@ fun PlaylistTile(context: ViewContext, playlist: Playlist) {
                                 .then(Modifier.size(36.dp)),
                             onClick = {
                                 context.symphony.radio.shorty.playQueue(
-                                    current.getSortedSongIds(context.symphony)
+                                    current.getSortedSongIds(context.symphony),
+                                    source = PlaySource.playlist(current.id),
                                 )
                             }
                         ) {
@@ -218,6 +220,7 @@ fun PlaylistDropdownMenu(
                 context.symphony.radio.shorty.playQueue(
                     playlist.getSortedSongIds(context.symphony),
                     shuffle = true,
+                    source = PlaySource.playlist(playlist.id),
                 )
             }
         )

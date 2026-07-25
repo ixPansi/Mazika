@@ -28,6 +28,7 @@ import io.github.zyrouge.symphony.ui.components.GenericSongListDropdown
 import io.github.zyrouge.symphony.ui.components.IconTextBody
 import io.github.zyrouge.symphony.ui.components.SongList
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import kotlinx.serialization.Serializable
 
@@ -97,7 +98,11 @@ fun GenreView(context: ViewContext, route: GenreViewRoute) {
                     .fillMaxSize()
             ) {
                 when {
-                    isViable -> SongList(context, songIds = songIds)
+                    isViable -> SongList(
+                        context,
+                        songIds = songIds,
+                        playSource = PlaySource.genre(route.genreName),
+                    )
                     else -> UnknownGenre(context, route.genreName)
                 }
             }

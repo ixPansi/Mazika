@@ -173,7 +173,7 @@ fun QueueView(context: ViewContext) {
                             contentType = { _, _ -> Groove.Kind.SONG },
                         ) { i, entry ->
                             context.symphony.groove.song.get(entry.value)?.let { song ->
-                                Box(modifier = reorderableItemModifier(reorderState, i)) {
+                                Box(modifier = reorderableItemModifier(reorderState, entry.uid)) {
                                     SongCard(
                                         context,
                                         song,
@@ -199,7 +199,7 @@ fun QueueView(context: ViewContext) {
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier
                                                     .size(20.dp)
-                                                    .reorderableHandle(reorderState, i),
+                                                    .reorderableHandle(reorderState, entry.uid),
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                         },

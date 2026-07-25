@@ -61,8 +61,17 @@ class ReorderableState internal constructor(
     private val onMove: (from: Int, to: Int) -> Unit,
     private val onSettle: () -> Unit,
 ) {
-    /** Data index currently being dragged, or null when idle. */
-    var draggingIndex by mutableStateOf<Int?>(null)
+    /**
+     * Key of the row being dragged, or null when idle.
+     *
+     * Identity, never position. A `LazyColumn` is measured once per frame but a
+     * touchscreen reports several times per frame, so between a move and the next
+     * measurement `layoutInfo` still describes the old arrangement. An index looked up
+     * against it names *a different row* — or nothing at all, once the position it names
+     * has scrolled out of view. A key always resolves to the row it belongs to, at
+     * whatever position layout currently believes it occupies.
+     */
+    var draggingKey by mutableStateOf<Any?>(null)
         private set
 
     /** Where the dragged row sat when the drag began. */
@@ -108,15 +117,18 @@ class ReorderableState internal constructor(
      */
     private var lastGoodOffset by mutableFloatStateOf(0f)
 
-    private fun lazyIndexOf(dataIndex: Int) = firstItemIndex() + dataIndex
+    /**
+     * Lazy index the dragged row is expected to occupy once layout applies the last move.
+     * While `layoutInfo` still disagrees, no further move is considered — see
+     * [recheckTarget].
+     */
+    private var awaitingIndex: Int? = null
 
-    private fun itemInfoAt(dataIndex: Int): LazyListItemInfo? {
-        val lazyIndex = lazyIndexOf(dataIndex)
-        return listState.layoutInfo.visibleItemsInfo.fastFirstOrNull { it.index == lazyIndex }
-    }
+    private fun itemInfoWithKey(key: Any): LazyListItemInfo? =
+        listState.layoutInfo.visibleItemsInfo.fastFirstOrNull { it.key == key }
 
     private val draggingItem: LazyListItemInfo?
-        get() = draggingIndex?.let { itemInfoAt(it) }
+        get() = draggingKey?.let { itemInfoWithKey(it) }
 
     /**
      * Pixel offset to apply to the dragged row. Derived, never accumulated, so it is
@@ -125,16 +137,22 @@ class ReorderableState internal constructor(
     val draggingOffset: Float
         get() = draggingItem?.let { initialOffset + dragged - it.offset } ?: lastGoodOffset
 
-    internal fun onDragStart(dataIndex: Int) {
-        if (dataIndex !in 0 until itemCount()) return
-        val item = itemInfoAt(dataIndex)
-        draggingIndex = dataIndex
-        initialOffset = item?.offset ?: 0
-        draggedSize = item?.size ?: 0
+    internal fun onDragStart(key: Any) {
+        // Refuse to start rather than starting a drag that tracks nothing: an
+        // unmeasurable row, or one outside the reorderable window, has no anchor.
+        val item = itemInfoWithKey(key) ?: return
+        val first = firstItemIndex()
+        if (item.index - first !in 0 until itemCount()) {
+            return
+        }
+        draggingKey = key
+        initialOffset = item.offset
+        draggedSize = item.size
         dragged = 0f
         lastGoodOffset = 0f
         scrollDirection = 0
         moved = false
+        awaitingIndex = null
     }
 
     internal fun onDrag(delta: Float) {
@@ -158,7 +176,11 @@ class ReorderableState internal constructor(
      */
     private fun clampToViewport() {
         val info = listState.layoutInfo
-        val size = draggingItem?.size?.also { draggedSize = it } ?: draggedSize
+        val size = draggingItem?.size?.also { draggedSize = it }
+            ?: draggedSize.takeIf { it > 0 }
+            // No height known at all: clamping to a zero-height row would let the drag
+            // travel a whole row past the bottom, which is the case this exists to stop.
+            ?: return
         val min = (info.viewportStartOffset - initialOffset).toFloat()
         val max = (info.viewportEndOffset - size - initialOffset).toFloat()
         if (max < min) {
@@ -169,12 +191,13 @@ class ReorderableState internal constructor(
     }
 
     internal fun onDragEnd() {
-        val shouldSettle = draggingIndex != null && moved
-        draggingIndex = null
+        val shouldSettle = draggingKey != null && moved
+        draggingKey = null
         dragged = 0f
         initialOffset = 0
         scrollDirection = 0
         moved = false
+        awaitingIndex = null
         if (shouldSettle) {
             onSettle()
         }
@@ -195,11 +218,23 @@ class ReorderableState internal constructor(
         // Where the dragged row actually is on screen right now.
         val offset = initialOffset + dragged - current.offset
         lastGoodOffset = offset
+
+        // At most one move per layout pass. A touchscreen reports two to four times per
+        // drawn frame, and until the list has been measured again `layoutInfo` still
+        // describes the pre-move arrangement — the midpoint is still sitting inside the
+        // neighbour it just swapped with, so re-testing would swap past it again, two or
+        // three more times, from a single finger movement.
+        awaitingIndex?.let {
+            if (current.index != it) {
+                return
+            }
+            awaitingIndex = null
+        }
+
         val start = current.offset + offset
         val middle = start + current.size / 2f
 
-        // A move triggers when the dragged row's midpoint crosses into another row,
-        // which gives one clean swap per boundary instead of several per frame. The
+        // A move triggers when the dragged row's midpoint crosses into another row. The
         // range is half-open: an inclusive one matches two rows at an exact boundary,
         // and the scan would always resolve that to the upper one.
         val first = firstItemIndex()
@@ -211,7 +246,7 @@ class ReorderableState internal constructor(
                     middle < item.offset + item.size
         } ?: return
         onMove(current.index - first, target.index - first)
-        draggingIndex = target.index - first
+        awaitingIndex = target.index
         moved = true
     }
 
@@ -316,7 +351,7 @@ fun rememberReorderableState(
     SideEffect { state.scrollBandPx = bandPx }
 
     // One scroll loop for the whole drag instead of a coroutine per pointer event.
-    val isDragging = state.draggingIndex != null
+    val isDragging = state.draggingKey != null
     LaunchedEffect(state, isDragging, speedPxPerSecond) {
         if (!isDragging) return@LaunchedEffect
         var previousFrame = 0L
@@ -378,7 +413,7 @@ private const val MAX_FRAME_STEP = 0.064f
 @Composable
 fun LazyItemScope.reorderableItemModifier(
     state: ReorderableState,
-    index: Int,
+    key: Any,
     enabled: Boolean = true,
 ): Modifier {
     if (!enabled) {
@@ -386,8 +421,11 @@ fun LazyItemScope.reorderableItemModifier(
         // library of thousands of songs would animate every row at once.
         return Modifier
     }
-    val dragging by remember(state, index) {
-        derivedStateOf { state.draggingIndex == index }
+    // Matched on the row's key, not its index: an index comparison hands the lift and
+    // the offset to whichever row currently sits at that position, which during a drag
+    // is regularly not the row being dragged.
+    val dragging by remember(state, key) {
+        derivedStateOf { state.draggingKey == key }
     }
     // animateItem stays in the chain for every row and only its spec changes. Adding or
     // removing it mid-drag restructures the item's modifier chain, which resets the
@@ -409,14 +447,16 @@ fun LazyItemScope.reorderableItemModifier(
 }
 
 /**
- * How a displaced row travels to its new place. Deliberately slower and softer than
- * Compose's default (`StiffnessMediumLow`, ~400): at the default the rows snap past
- * each other faster than the eye follows, which reads as a glitch rather than as a
- * swap. No bounce, because a row overshooting its slot looks like a second move.
+ * How a displaced row travels to its new place. Half the speed of Compose's default
+ * (`StiffnessMediumLow`, 400), because at the default rows snap past each other faster
+ * than the eye follows. Not slower than this: a spring retargeted mid-flight keeps its
+ * velocity, so at `StiffnessVeryLow` a run of quick swaps compounded into rows visibly
+ * flinging past their slots. No bounce either — a row overshooting looks like a second
+ * move that never happened.
  */
 private val ReorderPlacementSpec = spring(
     dampingRatio = Spring.DampingRatioNoBouncy,
-    stiffness = Spring.StiffnessVeryLow,
+    stiffness = Spring.StiffnessLow,
     visibilityThreshold = IntOffset.VisibilityThreshold,
 )
 
@@ -425,11 +465,11 @@ private val ReorderPlacementSpec = spring(
  * handle; the long-press gate keeps it from fighting the row's own click.
  */
 @Composable
-fun Modifier.reorderableItem(state: ReorderableState, index: Int): Modifier {
-    val currentIndex by rememberUpdatedState(index)
+fun Modifier.reorderableItem(state: ReorderableState, key: Any): Modifier {
+    val currentKey by rememberUpdatedState(key)
     return this.pointerInput(state) {
         detectDragGesturesAfterLongPress(
-            onDragStart = { state.onDragStart(currentIndex) },
+            onDragStart = { state.onDragStart(currentKey) },
             onDrag = { change, dragAmount ->
                 change.consume()
                 state.onDrag(dragAmount.y)
@@ -445,18 +485,17 @@ fun Modifier.reorderableItem(state: ReorderableState, index: Int): Modifier {
  * expected feel for a handle, and because the gesture lives on the handle the row's
  * own tap keeps working.
  *
- * The `pointerInput` key is the *state*, never the index. Compose cancels and relaunches
- * a `pointerInput` block whenever its key changes, and a row's index changes on every
- * swap — keying on the index destroyed the in-flight gesture mid-drag, so a drag died
- * after moving a single position. The index is read through [rememberUpdatedState]
- * instead, which stays current without restarting anything.
+ * The `pointerInput` key is the *state*, never the row. Compose cancels and relaunches a
+ * `pointerInput` block whenever its key changes, and a row's position changes on every
+ * swap — keying on that destroyed the in-flight gesture mid-drag, so a drag died after
+ * moving a single position.
  */
 @Composable
-fun Modifier.reorderableHandle(state: ReorderableState, index: Int): Modifier {
-    val currentIndex by rememberUpdatedState(index)
+fun Modifier.reorderableHandle(state: ReorderableState, key: Any): Modifier {
+    val currentKey by rememberUpdatedState(key)
     return this.pointerInput(state) {
         detectDragGestures(
-            onDragStart = { state.onDragStart(currentIndex) },
+            onDragStart = { state.onDragStart(currentKey) },
             onDrag = { change, dragAmount ->
                 change.consume()
                 state.onDrag(dragAmount.y)

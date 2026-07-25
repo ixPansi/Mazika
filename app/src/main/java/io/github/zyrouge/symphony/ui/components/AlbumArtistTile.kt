@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.zyrouge.symphony.services.groove.AlbumArtist
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.AlbumArtistViewRoute
 
@@ -41,7 +42,10 @@ fun AlbumArtistTile(context: ViewContext, albumArtist: AlbumArtist) {
             )
         },
         onPlay = {
-            context.symphony.radio.shorty.playQueue(albumArtist.getSortedSongIds(context.symphony))
+            context.symphony.radio.shorty.playQueue(
+                albumArtist.getSortedSongIds(context.symphony),
+                source = PlaySource.albumArtist(albumArtist.name),
+            )
         },
         onClick = {
             context.navController.navigate(AlbumArtistViewRoute(albumArtist.name))
@@ -74,6 +78,7 @@ fun AlbumArtistDropdownMenu(
                 context.symphony.radio.shorty.playQueue(
                     albumArtist.getSortedSongIds(context.symphony),
                     shuffle = true,
+                    source = PlaySource.albumArtist(albumArtist.name),
                 )
             }
         )

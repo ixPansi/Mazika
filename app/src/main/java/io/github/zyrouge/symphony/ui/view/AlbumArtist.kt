@@ -34,6 +34,7 @@ import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
 import io.github.zyrouge.symphony.ui.components.IconTextBody
 import io.github.zyrouge.symphony.ui.components.SongList
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import kotlinx.serialization.Serializable
 
@@ -98,6 +99,7 @@ fun AlbumArtistView(context: ViewContext, route: AlbumArtistViewRoute) {
                     SongList(
                         context,
                         songIds = songIds,
+                        playSource = PlaySource.albumArtist(route.albumArtistName),
                         leadingContent = {
                             item {
                                 AlbumArtistHero(context, albumArtist!!)

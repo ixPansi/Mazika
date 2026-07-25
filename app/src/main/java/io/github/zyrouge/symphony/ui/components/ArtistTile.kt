@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.zyrouge.symphony.services.groove.Artist
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.ArtistViewRoute
 
@@ -41,7 +42,10 @@ fun ArtistTile(context: ViewContext, artist: Artist) {
             )
         },
         onPlay = {
-            context.symphony.radio.shorty.playQueue(artist.getSortedSongIds(context.symphony))
+            context.symphony.radio.shorty.playQueue(
+                artist.getSortedSongIds(context.symphony),
+                source = PlaySource.artist(artist.name),
+            )
         },
         onClick = {
             context.navController.navigate(ArtistViewRoute(artist.name))
@@ -73,7 +77,8 @@ fun ArtistDropdownMenu(
                 onDismissRequest()
                 context.symphony.radio.shorty.playQueue(
                     artist.getSortedSongIds(context.symphony),
-                    shuffle = true
+                    shuffle = true,
+                    source = PlaySource.artist(artist.name),
                 )
             }
         )

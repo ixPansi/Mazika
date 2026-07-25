@@ -44,6 +44,7 @@ import io.github.zyrouge.symphony.ui.components.label
 import io.github.zyrouge.symphony.ui.helpers.Assets
 import io.github.zyrouge.symphony.ui.helpers.FadeTransition
 import io.github.zyrouge.symphony.ui.helpers.SlideTransition
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.nowPlaying.defaultHorizontalPadding
 import io.github.zyrouge.symphony.utils.SimpleFileSystem
@@ -267,6 +268,7 @@ private fun FolderTile(
                         context.symphony.radio.shorty.playQueue(
                             folder.getSortedSongIds(context),
                             shuffle = true,
+                            source = PlaySource.folder(folder.fullPath.pathString),
                         )
                     }
                 )
@@ -320,7 +322,10 @@ private fun FolderTile(
         },
         onPlay = {
             val sortedSongIds = folder.getSortedSongIds(context)
-            context.symphony.radio.shorty.playQueue(sortedSongIds)
+            context.symphony.radio.shorty.playQueue(
+                sortedSongIds,
+                source = PlaySource.folder(folder.fullPath.pathString),
+            )
         },
         onClick = onClick,
     )

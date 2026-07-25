@@ -62,6 +62,7 @@ import io.github.zyrouge.symphony.ui.components.GenericGrooveCard
 import io.github.zyrouge.symphony.ui.components.IconTextBody
 import io.github.zyrouge.symphony.ui.components.PlaylistDropdownMenu
 import io.github.zyrouge.symphony.ui.components.SongCard
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.utils.joinToStringIfNotEmpty
 import kotlinx.coroutines.Dispatchers
@@ -344,7 +345,10 @@ fun SearchView(context: ViewContext, route: SearchViewRoute) {
                                         songIds.forEach { songId ->
                                             context.symphony.groove.song.get(songId)?.let { song ->
                                                 SongCard(context, song) {
-                                                    context.symphony.radio.shorty.playQueue(song.id)
+                                                    context.symphony.radio.shorty.playQueue(
+                                                        song.id,
+                                                        source = PlaySource.song(song.path),
+                                                    )
                                                 }
                                             }
                                         }

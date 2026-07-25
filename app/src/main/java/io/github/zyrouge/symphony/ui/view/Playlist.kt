@@ -32,6 +32,7 @@ import io.github.zyrouge.symphony.ui.components.PlaylistDropdownMenu
 import io.github.zyrouge.symphony.ui.components.SongList
 import io.github.zyrouge.symphony.ui.components.SongListType
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.theme.ThemeColors
 import io.github.zyrouge.symphony.utils.mutate
@@ -130,6 +131,7 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
                         songIds = songIds,
                         type = SongListType.Playlist,
                         disableHeartIcon = isFavoritesPlaylist,
+                        playSource = PlaySource.playlist(route.playlistId),
                         // MAZIKA: drag the handle to reorder; persisted on release.
                         onReorder = { orderedSongIds ->
                             playlist?.let {

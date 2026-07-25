@@ -51,6 +51,7 @@ import coil.compose.AsyncImage
 import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
 import io.github.zyrouge.symphony.services.radio.Radio
 import io.github.zyrouge.symphony.ui.components.IconTextBody
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.AlbumArtistViewRoute
 import io.github.zyrouge.symphony.ui.view.AlbumViewRoute
@@ -152,6 +153,8 @@ fun ForYouView(context: ViewContext) {
                         )
                     }
                 }
+                // MAZIKA: what was last played, above what was last added.
+                RecentlyPlayedRow(context)
                 Spacer(modifier = Modifier.height(20.dp))
                 SideHeading {
                     Text(context.symphony.t.RecentlyAddedSongs)
@@ -181,6 +184,7 @@ fun ForYouView(context: ViewContext) {
                                         context.symphony.radio.shorty.playQueue(
                                             recentlyAddedSongs,
                                             options = Radio.PlayOptions(index = i),
+                                            source = PlaySource.song(song.path),
                                         )
                                     }
                                 ) {

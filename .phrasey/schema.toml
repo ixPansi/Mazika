@@ -224,6 +224,9 @@ name = "SuggestedArtists"
 [[keys]]
 name = "RecentlyAddedSongs"
 
+[[keys]]
+name = "RecentlyPlayed"
+
 # [[keys]]
 # name = "SponsorViaGithub"
 

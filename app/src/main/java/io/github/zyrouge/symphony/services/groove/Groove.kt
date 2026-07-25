@@ -5,6 +5,7 @@ import io.github.zyrouge.symphony.services.groove.repositories.AlbumArtistReposi
 import io.github.zyrouge.symphony.services.groove.repositories.AlbumRepository
 import io.github.zyrouge.symphony.services.groove.repositories.ArtistRepository
 import io.github.zyrouge.symphony.services.groove.repositories.GenreRepository
+import io.github.zyrouge.symphony.services.groove.repositories.PlayHistoryRepository
 import io.github.zyrouge.symphony.services.groove.repositories.PlaylistRepository
 import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
 import io.github.zyrouge.symphony.utils.Logger
@@ -46,6 +47,7 @@ class Groove(private val symphony: Symphony) : Symphony.Hooks {
     val albumArtist = AlbumArtistRepository(symphony)
     val genre = GenreRepository(symphony)
     val playlist = PlaylistRepository(symphony)
+    val playHistory = PlayHistoryRepository(symphony)
 
     private suspend fun fetch() {
         coroutineScope.launch {
@@ -55,6 +57,8 @@ class Groove(private val symphony: Symphony) : Symphony.Hooks {
             )
             // Custom song covers are keyed by path, so they load once songs exist.
             song.fetchCustomCovers()
+            // Likewise the play history, which resolves song paths back to the library.
+            playHistory.fetch()
         }.join()
     }
 
@@ -68,6 +72,7 @@ class Groove(private val symphony: Symphony) : Symphony.Hooks {
                 async { genre.reset() },
                 async { playlist.reset() },
                 async { song.reset() },
+                async { playHistory.reset() },
             )
         }.join()
     }
@@ -96,6 +101,8 @@ class Groove(private val symphony: Symphony) : Symphony.Hooks {
     }
 
     override fun onSymphonyReady() {
+        // Radio is constructed before this hook runs, so subscribing here is safe.
+        playHistory.start()
         coroutineScope.launch {
             try {
                 fetch()
