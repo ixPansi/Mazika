@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -99,17 +99,20 @@ fun PlaylistCoverCropDialog(
         failed = aspect == null
     }
 
-    AlertDialog(
+    // Uses the app's own ScaffoldDialog rather than a bare AlertDialog, so it
+    // matches every other dialog in MAZIKA (title bar, divider, action row).
+    ScaffoldDialog(
         onDismissRequest = onDismissRequest,
         title = { Text(context.symphony.t.ChangePlaylistCover) },
-        text = {
-            Column {
+        content = {
+            Column(modifier = Modifier.padding(16.dp, 12.dp)) {
                 if (failed) {
                     Text(context.symphony.t.UnableToSavePlaylistCover)
                 } else {
                     Text(
                         context.symphony.t.CropCoverHint,
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Box(
                         modifier = Modifier
@@ -117,7 +120,7 @@ fun PlaylistCoverCropDialog(
                             .fillMaxWidth()
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .pointerInput(imageAspect) {
                                 viewportPx = size.width.toFloat()
                                 detectTransformGestures { _, pan, zoom, _ ->
@@ -156,7 +159,11 @@ fun PlaylistCoverCropDialog(
                         horizontalArrangement = Arrangement.End,
                     ) {
                         TextButton(onClick = recenter) {
-                            Icon(Icons.Filled.CenterFocusStrong, null)
+                            Icon(
+                                Icons.Filled.CenterFocusStrong,
+                                null,
+                                modifier = Modifier.size(18.dp),
+                            )
                             Text(
                                 context.symphony.t.Center,
                                 modifier = Modifier.padding(start = 8.dp),
@@ -166,7 +173,10 @@ fun PlaylistCoverCropDialog(
                 }
             }
         },
-        confirmButton = {
+        actions = {
+            TextButton(onClick = onDismissRequest) {
+                Text(context.symphony.t.Cancel)
+            }
             TextButton(
                 enabled = !failed && imageAspect != null,
                 onClick = {
@@ -183,11 +193,6 @@ fun PlaylistCoverCropDialog(
                 },
             ) {
                 Text(context.symphony.t.SetAsCover)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text(context.symphony.t.Cancel)
             }
         },
     )

@@ -1,5 +1,6 @@
 package io.github.zyrouge.symphony
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,6 +19,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // MAZIKA: colour the splash logo to match the selected theme preset.
+        // The starting window is drawn by the system before any of our code runs, so
+        // the platform's setSplashScreenTheme is the supported way to do this - it
+        // takes effect from the *next* launch. setTheme covers the pre-31 compat
+        // path, where androidx draws the splash itself from the activity theme.
+        val splashPreset = SymphonyProvider.get(application).settings.themePreset.value
+        runCatching {
+            setTheme(splashPreset.splashTheme)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                splashScreen.setSplashScreenTheme(splashPreset.splashTheme)
+            }
+        }.onFailure {
+            Logger.warn("MainActivity", "unable to apply splash theme: $it")
+        }
 
         val ignition: ActivityIgnition by viewModels()
         if (savedInstanceState == null) {

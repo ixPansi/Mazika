@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,7 +69,14 @@ fun IntroductoryDialog(
                 )
                 Box(modifier = Modifier.height(8.dp))
             }
-        }
+        },
+        // MAZIKA: the dialog previously had no actions at all, so with the long
+        // welcome text filling the sheet there was no visible way to close it.
+        actions = {
+            TextButton(onClick = onDismissRequest) {
+                Text(context.symphony.t.Done)
+            }
+        },
     )
 }
 

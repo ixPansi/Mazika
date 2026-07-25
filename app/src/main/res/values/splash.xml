@@ -8,4 +8,64 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+
+    <!-- MAZIKA: splash variant for the Red theme preset. Selected at runtime via
+         SplashScreen.setSplashScreenTheme (API 31+) / setTheme (older). -->
+    <style name="Theme.Symphony.SplashScreen.Red" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_red</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Symphony</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- MAZIKA: splash variant for the Blue theme preset. Selected at runtime via
+         SplashScreen.setSplashScreenTheme (API 31+) / setTheme (older). -->
+    <style name="Theme.Symphony.SplashScreen.Blue" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_blue</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Symphony</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- MAZIKA: splash variant for the Green theme preset. Selected at runtime via
+         SplashScreen.setSplashScreenTheme (API 31+) / setTheme (older). -->
+    <style name="Theme.Symphony.SplashScreen.Green" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_green</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Symphony</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- MAZIKA: splash variant for the Cyan theme preset. Selected at runtime via
+         SplashScreen.setSplashScreenTheme (API 31+) / setTheme (older). -->
+    <style name="Theme.Symphony.SplashScreen.Cyan" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_cyan</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Symphony</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- MAZIKA: splash variant for the Orange theme preset. Selected at runtime via
+         SplashScreen.setSplashScreenTheme (API 31+) / setTheme (older). -->
+    <style name="Theme.Symphony.SplashScreen.Orange" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_orange</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Symphony</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- MAZIKA: splash variant for the Purple theme preset. Selected at runtime via
+         SplashScreen.setSplashScreenTheme (API 31+) / setTheme (older). -->
+    <style name="Theme.Symphony.SplashScreen.Purple" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_purple</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Symphony</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>
