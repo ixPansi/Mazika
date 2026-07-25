@@ -30,7 +30,7 @@ media browser service and lets you walk the browse tree and fire transport contr
 
 2. Install MAZIKA and grant it storage/media permission so the library is not empty:
    ```bash
-   adb install -r artifacts/MAZIKA-debug.apk
+   adb install -r artifacts/MAZIKA.apk
    ```
 
 3. Open **Media Controller Test** → pick **MAZIKA** from the list of media apps.
@@ -79,8 +79,8 @@ This is the closest thing to a car.
 
 ```bash
 adb forward tcp:5277 tcp:5277
-cd "$ANDROID_HOME/extras/google/auto"
-./desktop-head-unit          # Windows: desktop-head-unit.exe
+cd "C:\Users\Pc\Android\Sdk\extras\google\auto"
+desktop-head-unit.exe        # Linux/macOS: ./desktop-head-unit
 ```
 
 The DHU window opens. Go to the media apps list, pick **MAZIKA**, and test the same
@@ -106,7 +106,7 @@ In Android Studio: **Device Manager → Create Device → Automotive** → pick 
 "Automotive with Play Store" system image. Launch it and install MAZIKA:
 
 ```bash
-adb install -r artifacts/MAZIKA-debug.apk
+adb install -r artifacts/MAZIKA.apk
 ```
 
 Note MAZIKA targets phone Android Auto; it declares `<uses name="media"/>` in
@@ -132,9 +132,30 @@ adb logcat | grep -iE "RadioBrowser|MAZIKALogger"
 
 ## Troubleshooting
 
-- **MAZIKA missing from the car/DHU app list** — enable *Unknown sources* in Android
-  Auto developer settings (required for debug builds), and confirm the service is
-  exported with the `MediaBrowserService` intent filter.
+- **MAZIKA missing from the car/DHU app list (and from "Customise")** — work through
+  these in order:
+
+  1. **Use a build from 2026-07-25 or later.** Earlier builds declared the Auto
+     descriptor with `android:value` instead of `android:resource`. Android Auto reads
+     that metadata as a resource id, so it could not resolve the descriptor and never
+     registered MAZIKA as a media app. Verify your APK:
+     ```bash
+     aapt2 dump xmltree --file AndroidManifest.xml artifacts/MAZIKA.apk | grep -A2 car.application
+     ```
+     You must see `android:resource(0x01010025)=@0x...`, **not** `android:value`.
+  2. **Enable *Unknown sources*** in Android Auto -> Developer settings. Sideloaded
+     builds are hidden without it.
+  3. **Clear Android Auto's cache** - it caches the media-app list aggressively:
+     ```bash
+     adb shell pm clear com.google.android.projection.gearhead
+     ```
+     Then reopen Android Auto and redo *Start head unit server*.
+  4. **Launch MAZIKA once on the phone** and grant media permission, so it is not an
+     app that has never run.
+  5. Confirm the service is exported and discoverable:
+     ```bash
+     adb shell cmd package query-services --brief -a android.media.browse.MediaBrowserService | grep mazika
+     ```
 - **Empty categories** — the library has not been scanned yet. Open MAZIKA on the
   phone, grant media permission and let it scan; browse requests wait up to 10s for
   the scan and then return what exists.

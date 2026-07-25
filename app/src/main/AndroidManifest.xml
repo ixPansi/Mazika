@@ -117,6 +117,21 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- MAZIKA: Android Auto voice search ("play X on MAZIKA"). Required for
+             Auto media apps. No UI: it starts playback and finishes immediately so a
+             command given while driving never opens the phone UI. -->
+        <activity
+            android:name=".MediaSearchActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:noHistory="true">
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity android:name=".ErrorActivity" />
 
         <service
@@ -144,9 +159,13 @@
             android:exported="false"
             android:grantUriPermissions="true" />
 
-        <!-- MAZIKA: declares Android Auto media support. -->
+        <!-- MAZIKA: declares Android Auto media support.
+             This MUST use android:resource, not android:value - Android Auto reads
+             the metadata as a resource id and then inflates that XML. With
+             android:value the reference cannot be resolved, so the app is never
+             recognised as an Auto media app and never appears in the car app list. -->
         <meta-data
             android:name="com.google.android.gms.car.application"
-            android:value="@xml/automotive_app_desc" />
+            android:resource="@xml/automotive_app_desc" />
     </application>
 </manifest>

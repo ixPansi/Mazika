@@ -92,11 +92,16 @@
 - `MediaId` — base64url, separator-safe ids encoding the play context, so selecting a
   song builds the correct album/artist/playlist/genre/folder queue.
 - Session callbacks `onPlayFromMediaId` / `onPrepareFromMediaId` / `onPlayFromSearch`
-  route through `Radio` (audio focus + fade preference respected).
+  route through `Radio` (audio focus + fade preference respected). `MediaSearchActivity`
+  handles `android.media.action.MEDIA_PLAY_FROM_SEARCH` (required by Android Auto for
+  voice search) as a no-UI trampoline delegating to the same `RadioSession.playFromSearch`.
 - `ArtworkProvider` — read-only, non-exported content provider; the browser service
   grants per-uri read to the connecting client so covers/artwork render in the car.
 - Manifest: exported browser service with the `MediaBrowserService` intent filter,
-  `res/xml/automotive_app_desc.xml` (`uses media`), and the car application meta-data.
+  `res/xml/automotive_app_desc.xml` (`uses media`), and the car application meta-data
+  declared with **`android:resource`** (not `android:value` - Android Auto resolves
+  that metadata as a resource id, and using `android:value` stops the app from ever
+  appearing in the car app list).
 - No lyrics on the driving screen.
 
 ### Rebranding
@@ -153,8 +158,8 @@ test failures introduced by this work.
 
 ### Release (signed) - the shipping build
 - Path: `artifacts/MAZIKA.apk` (copy of `app-universal-release.apk`)
-- Size: **14,263,945 bytes** (R8-minified; ABI splits are ~9 MB each)
-- SHA-256: `19a78d437ab52c489d1eafd5093cbfbf6c41c3d32a483e222516778774badc2c`
+- Size: **14,264,109 bytes** (R8-minified; ABI splits are ~9 MB each)
+- SHA-256: `bd40e3e8bc6a6bbecc500c3647202abd26a749b5081c8f01452bb5b5e6581674`
 - Application id: `com.mazika.musicplayer` - label `MAZIKA`
 - Version: `2024.12.115` (versionCode 115)
 - Min Android: 9 (API 28); target API 34

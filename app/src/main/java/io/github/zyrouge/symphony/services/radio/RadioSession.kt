@@ -36,6 +36,12 @@ class RadioSession(val symphony: Symphony) {
     // MAZIKA: resolves Android Auto browse/search media ids onto the shared engine.
     private val browser by lazy { RadioBrowser(symphony) }
 
+    /**
+     * MAZIKA: search-and-play entry point shared by the media session callback and the
+     * MEDIA_PLAY_FROM_SEARCH activity, so voice search has exactly one implementation.
+     */
+    fun playFromSearch(query: String?) = browser.playFromSearch(query)
+
     private var currentSongId: String? = null
     private var receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -122,7 +128,7 @@ class RadioSession(val symphony: Symphony) {
 
                 override fun onPlayFromSearch(query: String?, extras: Bundle?) {
                     super.onPlayFromSearch(query, extras)
-                    browser.playFromSearch(query)
+                    playFromSearch(query)
                 }
 
                 override fun onRewind() {
