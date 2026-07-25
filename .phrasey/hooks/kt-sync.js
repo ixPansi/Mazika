@@ -64,10 +64,6 @@ async function createTranslationKt(phrasey, state, log) {
     /**
      * @type {string[]}
      */
-    const containerKeys = [];
-    /**
-     * @type {string[]}
-     */
     const staticKeys = [];
     /**
      * @type {string[]}
@@ -75,16 +71,15 @@ async function createTranslationKt(phrasey, state, log) {
     const dynamicKeys = [];
 
     for (const x of state.getSchema().z.keys) {
-        containerKeys.push(`        val ${x.name}: String,`);
         if (x.parameters && x.parameters.length > 0) {
             const params = x.parameters.map((x) => `${x}: String`).join(", ");
             const callArgs = x.parameters.join(", ");
             dynamicKeys.push(
-                `    fun ${x.name}(${params}): String = container.keys.${x.name}.format(${callArgs})`,
+                `    fun ${x.name}(${params}): String = key("${x.name}").format(${callArgs})`,
             );
         } else {
             staticKeys.push(
-                `    val ${x.name}: String get() = container.keys.${x.name}`,
+                `    val ${x.name}: String get() = key("${x.name}")`,
             );
         }
     }
@@ -99,7 +94,7 @@ import kotlinx.serialization.Serializable
 open class _Translation(private val container: _Container) {
     @Immutable
     @Serializable
-    data class _Container(val locale: _Locale, val keys: _Keys)
+    data class _Container(val locale: _Locale, val keys: Map<String, String>)
 
     @Immutable
     @Serializable
@@ -110,11 +105,15 @@ open class _Translation(private val container: _Container) {
         val direction: String,
     )
 
-    @Immutable
-    @Serializable
-    data class _Keys(
-${containerKeys.join("\n")}
-    )
+    // Keys are looked up by name rather than generated as one constructor
+    // parameter each. A @Serializable class with one property per string makes
+    // kotlinx.serialization emit a synthetic constructor whose argument list
+    // overflows the Dalvik/ART 255-register limit once the schema passes ~245
+    // keys, which the verifier rejects at runtime with:
+    //   java.lang.VerifyError: Verifier rejected class _Translation$_Keys$$serializer
+    // A map keeps the generated code flat, so the schema can grow freely.
+    // Falls back to the key name so a missing string can never crash startup.
+    private fun key(name: String): String = container.keys[name] ?: name
 
     val LocaleDisplayName: String get() = container.locale.display
     val LocaleNativeName: String get() = container.locale.native

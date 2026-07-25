@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import io.github.zyrouge.symphony.ui.view.BaseView
 import io.github.zyrouge.symphony.utils.Logger
+import kotlin.system.exitProcess
 
 class MainActivity : ComponentActivity() {
     private var gSymphony: Symphony? = null
@@ -24,10 +25,24 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        Thread.setDefaultUncaughtExceptionHandler { _, err ->
+        // MAZIKA: report the crash, then hand over to the platform handler so the
+        // process actually dies. Previously this handler swallowed the kill: on a
+        // main-thread throw the exception escaped Looper.loop(), ActivityThread.main()
+        // unwound and the main thread died, but the process stayed alive. ErrorActivity
+        // could then never be created (its host thread was gone) and the splash screen's
+        // keep-on-screen condition never cleared, so every startup crash presented as an
+        // app frozen forever on the splash with no crash dialog and no way to recover.
+        val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, err ->
             Logger.error("MainActivity", "uncaught exception", err)
-            ErrorActivity.start(this, err)
-            finish()
+            try {
+                ErrorActivity.start(this, err)
+                finish()
+            } catch (_: Throwable) {
+                // Reporting must never mask the original failure.
+            }
+            defaultExceptionHandler?.uncaughtException(thread, err)
+                ?: exitProcess(1)
         }
 
         // MAZIKA: obtain the single process-scoped Symphony so the phone UI and the
