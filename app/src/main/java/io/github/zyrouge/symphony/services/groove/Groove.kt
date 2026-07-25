@@ -7,9 +7,12 @@ import io.github.zyrouge.symphony.services.groove.repositories.ArtistRepository
 import io.github.zyrouge.symphony.services.groove.repositories.GenreRepository
 import io.github.zyrouge.symphony.services.groove.repositories.PlaylistRepository
 import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
+import io.github.zyrouge.symphony.utils.Logger
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
@@ -24,7 +27,16 @@ class Groove(private val symphony: Symphony) : Symphony.Hooks {
         PLAYLIST,
     }
 
-    val coroutineScope = CoroutineScope(Dispatchers.Default)
+    // MAZIKA: a SupervisorJob plus an exception handler, so one failed child (a bad
+    // file during a scan, a browse request, a playlist write) cannot cancel the
+    // scope for the whole process. With a plain Job the first uncaught failure
+    // silently disabled media-session updates, queue restore and all playlist
+    // persistence for the rest of the session.
+    val coroutineScope = CoroutineScope(
+        Dispatchers.Default + SupervisorJob() + CoroutineExceptionHandler { _, err ->
+            Logger.error("Groove", "uncaught exception in groove scope", err)
+        }
+    )
     var readyDeferred = CompletableDeferred<Boolean>()
 
     val exposer = MediaExposer(symphony)
@@ -83,8 +95,15 @@ class Groove(private val symphony: Symphony) : Symphony.Hooks {
 
     override fun onSymphonyReady() {
         coroutineScope.launch {
-            fetch()
-            readyDeferred.complete(true)
+            try {
+                fetch()
+            } catch (err: Exception) {
+                Logger.error("Groove", "initial fetch failed", err)
+            } finally {
+                // Always complete: anything awaiting readiness (queue restore, the
+                // Android Auto browser) must not block forever on a failed scan.
+                readyDeferred.complete(true)
+            }
         }
     }
 }

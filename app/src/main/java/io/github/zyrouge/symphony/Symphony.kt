@@ -38,6 +38,7 @@ class Symphony(application: Application) : AndroidViewModel(application), Sympho
 
     val applicationContext get() = getApplication<Application>().applicationContext
     var closeApp: (() -> Unit)? = null
+    @Volatile
     private var isReady = false
     private var hooks = listOf(this, radio, groove)
 
@@ -46,7 +47,16 @@ class Symphony(application: Application) : AndroidViewModel(application), Sympho
             return
         }
         isReady = true
-        notifyHooks { onSymphonyReady() }
+        try {
+            notifyHooks { onSymphonyReady() }
+        } catch (err: Throwable) {
+            // MAZIKA: this instance is process-scoped, so a half-initialised state
+            // would otherwise persist for the lifetime of the process and every
+            // later emitReady() would short-circuit, leaving the app permanently
+            // broken. Clear the latch so initialisation can be retried.
+            isReady = false
+            throw err
+        }
     }
 
     internal fun emitDestroy() {

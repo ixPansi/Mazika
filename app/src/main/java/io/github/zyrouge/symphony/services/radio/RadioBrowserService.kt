@@ -7,7 +7,9 @@ import androidx.media.MediaBrowserServiceCompat
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.SymphonyProvider
 import io.github.zyrouge.symphony.utils.Logger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -23,12 +25,30 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
 
     override fun onCreate() {
         super.onCreate()
-        symphony = SymphonyProvider.get(application)
-        // Ensure the library loads and the media session starts even if no activity
-        // ever ran (idempotent — a no-op once the app is already initialised).
-        symphony.emitReady()
-        browser = RadioBrowser(symphony)
-        sessionToken = symphony.radio.session.mediaSession.sessionToken
+        // This service is exported, so the system (media resumption, Assistant,
+        // Android Auto) can create it independently of the activity — potentially
+        // before any crash handler is installed. Keep the work here minimal and
+        // guarded: publishing the session token is all that is needed to connect.
+        // Bootstrapping the app (emitReady -> media session, receivers, library
+        // scan) is deferred to the first browse/search request instead, so merely
+        // being bound cannot start playback machinery or take down the process.
+        try {
+            symphony = SymphonyProvider.get(application)
+            browser = RadioBrowser(symphony)
+            sessionToken = symphony.radio.session.mediaSession.sessionToken
+        } catch (err: Throwable) {
+            Logger.error("RadioBrowserService", "initialisation failed", err)
+            stopSelf()
+        }
+    }
+
+    /** Initialises the app on demand, when a browser client actually asks for content. */
+    private fun ensureReady() {
+        try {
+            symphony.emitReady()
+        } catch (err: Throwable) {
+            Logger.error("RadioBrowserService", "emitReady failed", err)
+        }
     }
 
     override fun onGetRoot(
@@ -42,6 +62,7 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
 
     override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaItem>>) {
         result.detach()
+        ensureReady()
         symphony.groove.coroutineScope.launch {
             val items = try {
                 withTimeoutOrNull(LIBRARY_WAIT_MS) { symphony.groove.readyDeferred.await() }
@@ -50,8 +71,18 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
                 Logger.error("RadioBrowserService", "onLoadChildren failed for $parentId", err)
                 emptyList()
             }
-            grantIconPermissions(items)
-            result.sendResult(items.toMutableList())
+            // MediaBrowserServiceCompat is not thread safe: sendResult must be
+            // delivered on the service's main thread, and it throws if the result
+            // was already sent. Both calls stay inside the guard so a failure here
+            // can never escape into the shared coroutine scope.
+            withContext(Dispatchers.Main) {
+                try {
+                    grantIconPermissions(items)
+                    result.sendResult(items.toMutableList())
+                } catch (err: Exception) {
+                    Logger.error("RadioBrowserService", "sending children failed", err)
+                }
+            }
         }
     }
 
@@ -61,6 +92,7 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         result: Result<MutableList<MediaItem>>,
     ) {
         result.detach()
+        ensureReady()
         symphony.groove.coroutineScope.launch {
             val items = try {
                 withTimeoutOrNull(LIBRARY_WAIT_MS) { symphony.groove.readyDeferred.await() }
@@ -69,8 +101,14 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
                 Logger.error("RadioBrowserService", "onSearch failed for '$query'", err)
                 emptyList()
             }
-            grantIconPermissions(items)
-            result.sendResult(items.toMutableList())
+            withContext(Dispatchers.Main) {
+                try {
+                    grantIconPermissions(items)
+                    result.sendResult(items.toMutableList())
+                } catch (err: Exception) {
+                    Logger.error("RadioBrowserService", "sending search results failed", err)
+                }
+            }
         }
     }
 
