@@ -151,27 +151,26 @@ test failures introduced by this work.
 
 ## APK files
 
-### Debug (installable, debug-signed)
-- Path: `artifacts/MAZIKA-debug.apk` (copy of `app-universal-debug.apk`)
-- Size: **84,827,303 bytes**
-- SHA-256: `823124c311a3168fb47d109f5f557eb2dce78eebddfd816f63fbce0040b557e6`
-- Application id: `com.mazika.musicplayer.debug`
-- Version: `2024.12.115-debug` (versionCode 115)
-- Min Android: 9 (API 28); target API 34
-- Build type: debug; Signing: Android debug keystore (auto-generated) — installable.
-
-### Release (unsigned)
-- Path: `artifacts/MAZIKA-release-unsigned.apk` (copy of
-  `app-universal-release-unsigned.apk`)
-- Size: **14,245,121 bytes** (R8-minified; the ABI-split release APKs are ~9 MB each)
-- SHA-256: `edcbdd5325507c5a436e4867ccd2cdec7309722345b4f200fc589158a874bca2`
-- Application id: `com.mazika.musicplayer`
+### Release (signed) - the shipping build
+- Path: `artifacts/MAZIKA.apk` (copy of `app-universal-release.apk`)
+- Size: **14,263,945 bytes** (R8-minified; ABI splits are ~9 MB each)
+- SHA-256: `19a78d437ab52c489d1eafd5093cbfbf6c41c3d32a483e222516778774badc2c`
+- Application id: `com.mazika.musicplayer` - label `MAZIKA`
 - Version: `2024.12.115` (versionCode 115)
 - Min Android: 9 (API 28); target API 34
-- Build type: release (minified); **Signing: unsigned** — no release keystore was
-  provided, so `assembleRelease` produces an unsigned APK (build.gradle only applies
-  the release signing config when `SIGNING_KEYSTORE_FILE` is set). Sign it per
-  `SIGNING.md`, or install the debug APK for testing.
+- Signing: **signed and verified** with the local MAZIKA release key
+  (`CN=MAZIKA`, SHA-256 `5c37cba494d09b6026c5ec6d53464caa94b9818bc94f80305ba2b131ee7e4189`).
+  The keystore lives in the git-ignored `secrets/` folder - see `SIGNING.md`.
+
+MAZIKA now has a single product identity: the `.debug` application id suffix, the
+`-debug` version suffix and the "(Debug)"/"(Canary)" label overrides were all
+removed, so every build type installs and presents as the finished app. When a
+keystore is configured, debug builds are signed with the same key, so debug and
+release can replace each other without an uninstall.
+
+Verified on device (emulator-5554, Android 12): the minified release installs,
+launches in ~1.2s, renders translations and theming correctly (confirming R8 did not
+strip the serialization/Room/Compose paths) and reports no crashes.
 
 Lint: `lintDebug` passes with **0 errors** (73 warnings, of which ~69 are
 pre-existing "newer dependency version available" advisories inherited from upstream;

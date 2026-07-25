@@ -17,7 +17,35 @@ signingConfigs {
 If these variables are not set, `assembleRelease` produces an **unsigned** release
 APK (`*-release-unsigned.apk`). Install the debug APK for testing.
 
-## Generate a permanent MAZIKA release keystore
+
+## This repository already has a local release key
+
+A release keystore has been generated for MAZIKA and lives at:
+
+```
+secrets/mazika-release.jks          # the key itself
+secrets/keystore.env                # its credentials
+```
+
+Both are **git-ignored** (`.gitignore` ignores `secrets`) and are deliberately not
+committed. `artifacts/MAZIKA.apk` is signed with this key.
+
+Build a signed release with it:
+
+```bash
+set -a; source secrets/keystore.env; set +a
+./gradlew assembleRelease          # Windows: gradlew.bat assembleRelease
+```
+
+When a keystore is configured, debug builds are signed with the same key too, so a
+debug build can replace a release build (and vice versa) without uninstalling.
+
+> **Back this folder up.** If `secrets/mazika-release.jks` is lost, you can never
+> ship an update to an installed copy of MAZIKA - Android rejects an update whose
+> signing certificate differs. Keep the same application id
+> (`com.mazika.musicplayer`) and the same key for every future release.
+
+## Generate a different keystore (if you ever need one)
 
 Do this once and keep the keystore and passwords safe and private. **Never commit
 the keystore or passwords to the repository.**

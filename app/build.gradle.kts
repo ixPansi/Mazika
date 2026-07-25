@@ -61,8 +61,15 @@ android {
             applicationIdSuffix = ".canary"
         }
         debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            // MAZIKA ships a single product identity: no ".debug" application id
+            // suffix, no "-debug" version suffix and no "(Debug)" label, so every
+            // build installs and presents as the finished MAZIKA app.
+            // When a release keystore is configured we sign debug with it too, so
+            // debug and release builds share a signature and can replace each other
+            // without an uninstall.
+            signingConfig = System.getenv("SIGNING_KEYSTORE_FILE")
+                ?.let { signingConfigs.findByName("release") }
+                ?: signingConfig
         }
     }
 

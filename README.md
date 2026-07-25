@@ -79,8 +79,12 @@ sdk.dir=C:/Users/<you>/Android/Sdk
 ```
 
 APKs are written to `app/build/outputs/apk/debug/` (ABI splits plus a
-`app-universal-debug.apk`). A ready-to-install copy is provided at
-[`artifacts/MAZIKA-debug.apk`](./artifacts/).
+`app-universal-debug.apk`).
+
+**The ready-to-install app is [`artifacts/MAZIKA.apk`](./artifacts/)** - a signed,
+minified release build (~14 MB). MAZIKA has a single identity across build types:
+application id `com.mazika.musicplayer`, label `MAZIKA`, with no `.debug` suffix or
+"(Debug)" label, so every build installs and presents as the finished app.
 
 ### Release build
 
@@ -88,22 +92,31 @@ APKs are written to `app/build/outputs/apk/debug/` (ABI splits plus a
 gradlew.bat assembleRelease
 ```
 
-Release builds are minified (R8) and signed with a keystore supplied via
-environment variables. See [`SIGNING.md`](./SIGNING.md) for how to generate and use
-a permanent MAZIKA release keystore. Without a keystore an unsigned release APK is
-produced (install the debug APK for testing).
+Release builds are minified (R8) and signed with a keystore supplied via environment
+variables. A local release key already exists at `secrets/mazika-release.jks`
+(git-ignored); load it and build with:
+
+```bash
+set -a; source secrets/keystore.env; set +a
+gradlew.bat assembleRelease
+```
+
+See [`SIGNING.md`](./SIGNING.md). Without a keystore an unsigned release APK is
+produced instead of the build failing.
 
 ## Android Auto testing
 
 Android Auto cannot be verified from a headless build. To test on real hardware:
 
-1. Install `MAZIKA-debug.apk` on a phone and grant the music-library permission.
+1. Install `artifacts/MAZIKA.apk` on a phone and grant the music-library permission.
 2. Enable **Developer settings** in the Android Auto app and turn on **Unknown
-   sources** so the debug build is visible.
+   sources** so a sideloaded build is visible.
 3. Connect to the **Desktop Head Unit (DHU)** or a real Android Auto head unit and
    open MAZIKA from the media apps list.
 4. Alternatively, use the **Media Controller Test** app to exercise the
    `MediaBrowserService` browse tree and transport controls without a car.
+
+See [`ANDROID_AUTO_TESTING.md`](./ANDROID_AUTO_TESTING.md) for the full walkthrough.
 
 ## Playlist cover storage
 
@@ -121,6 +134,7 @@ user's original gallery image is never modified or deleted.
   changed, migrations, tests, APKs, limitations.
 - [`TESTING.md`](./TESTING.md) — manual test cases.
 - [`SIGNING.md`](./SIGNING.md) — release signing.
+- [`ANDROID_AUTO_TESTING.md`](./ANDROID_AUTO_TESTING.md) — testing Android Auto without a car.
 
 ## License
 
