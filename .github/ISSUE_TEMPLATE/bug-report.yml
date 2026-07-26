@@ -63,10 +63,3 @@ body:
           placeholder: "2023.04.20"
       validations:
           required: true
-
-    - type: checkboxes
-      attributes:
-          label: Contribution Guidelines
-          options:
-              - label: I agree to follow the [Contribution Guidelines](https://github.com/zyrouge/symphony/wiki/Contributions-Guidelines#issues).
-                required: true

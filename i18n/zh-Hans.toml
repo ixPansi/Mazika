@@ -3,16 +3,6 @@ locale = "zh-Hans"
 
 [keys]
 UnknownSymbol = "?"
-HelloThere = "您好！"
-IntroductoryMessage = """
-感谢您试用MAZIKA公开测试版。如果您遇到了任何问题，或想提出任何建议，请您在我们的Github仓库中创建新的Issue。
-
-您也可以加入我们的Discord或Reddit社区以分享您的使用体验并获得开发的最新进度。
-
-MAZIKA由来自Github Sponsors，Ko-fi和Patreon的捐赠支持开发。
-
-再一次感谢您试用MAZIKA！
-"""
 Songs = "歌曲"
 Artists = "艺术家"
 Albums = "专辑"

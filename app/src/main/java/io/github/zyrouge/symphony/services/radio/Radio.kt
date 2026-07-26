@@ -7,6 +7,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.Date
 import java.util.Timer
+import java.util.concurrent.atomic.AtomicBoolean
 
 class Radio(private val symphony: Symphony) : Symphony.Hooks {
     sealed class Events {
@@ -46,16 +47,24 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
     val onUpdate = Eventer<Events>()
     val queue = RadioQueue(symphony)
     val shorty = RadioShorty(symphony)
+    internal val artworkUris = ArtworkUriResolver(symphony)
     val session = RadioSession(symphony)
     var observatory = RadioObservatory(symphony)
 
     private val focus = RadioFocus(symphony)
     private val nativeReceiver = RadioNativeReceiver(symphony)
+    private val transition = PlaybackTransition()
+    private val playbackLock = Any()
+    @Volatile
     private var player: RadioPlayer? = null
-    private var nextPlayer: RadioPlayer? = null
+    @Volatile
+    private var stagedPlayer: RadioPlayer? = null
+    @Volatile
+    private var outgoingPlayer: RadioPlayer? = null
 
-    val hasPlayer get() = player?.usable == true
-    val isPlaying get() = player?.isPlaying == true
+    val hasPlayer get() = player != null
+    val playWhenReady get() = transition.playWhenReady
+    val isPlaying get() = player?.isPlaying == true || outgoingPlayer?.isPlaying == true
     val currentPlaybackPosition get() = player?.playbackPosition
     val currentSpeed get() = player?.speed ?: RadioPlayer.DEFAULT_SPEED
     val currentPitch get() = player?.pitch ?: RadioPlayer.DEFAULT_PITCH
@@ -91,44 +100,131 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
         val startPosition: Long? = null,
     )
 
-    fun play(options: PlayOptions) {
-        stopCurrentSong()
-        val song = queue.getSongIdAt(options.index)?.let { symphony.groove.song.get(it) }
+    fun play(options: PlayOptions) = play(options, requestedSongId = null)
+
+    private fun play(options: PlayOptions, requestedSongId: String?) {
+        // Register intent before constructing MediaPlayer. A pause that arrives while
+        // setDataSource is blocking must win over this request's eventual prepare callback.
+        val generation = transition.begin(options.autostart)
+        val playTarget = when (requestedSongId) {
+            null -> queue.resolvePlayTarget(options.index)
+            else -> queue.resolvePlayTarget(requestedSongId, options.index)
+        }
+        val song = playTarget?.songId?.let { symphony.groove.song.get(it) }
         if (song == null) {
-            onSongFinish(SongFinishSource.Exception)
+            val shouldContinue = transition.invalidateIfCurrent(generation)
+            if (shouldContinue != null && playTarget != null) {
+                removeFailedSong(playTarget, shouldContinue)
+            } else if (shouldContinue != null) {
+                if (requestedSongId == null) {
+                    onSongFinish(SongFinishSource.Exception)
+                } else {
+                    restorePlaybackIntent(shouldContinue)
+                }
+            }
             return
         }
+        var incoming: RadioPlayer? = null
         try {
-            queue.currentSongIndex = options.index
-            player = nextPlayer?.takeIf {
-                when {
-                    it.id == song.id -> true
-                    else -> {
-                        it.destroy()
-                        false
+            val target = adoptStagedPlayer(song.id) ?: RadioPlayer(symphony, song.id, song.uri)
+            incoming = target
+            var adopted = false
+            transition.runIfCurrent(generation) {
+                queue.withResolvedPlayTarget(playTarget) { committedIndex ->
+                    synchronized(playbackLock) {
+                        val previous = player
+                        player = target
+                        attachPlayerListeners(target, generation, options)
+                        // Publishing the outgoing player in this same critical section means
+                        // pause can never miss audio displaced by the handoff.
+                        retirePlayer(previous, allowFade = transition.playWhenReady)
                     }
+                    // Keep ownership, queue identity and preparation on one generation
+                    // and one queue occurrence.
+                    queue.currentSongIndex = committedIndex
+                    target.prepare()
+                    onUpdate.dispatch(Events.Player.Staged)
+                    adopted = true
                 }
-            } ?: RadioPlayer(symphony, song.id, song.uri)
-            nextPlayer = null
-            player!!.setOnPreparedListener {
+            }
+            if (!adopted) {
+                disposePlayer(target)
+                transition.invalidateIfCurrent(generation)?.let { shouldContinue ->
+                    retryPlayTarget(playTarget, shouldContinue)
+                }
+                return
+            }
+        } catch (err: Exception) {
+            val shouldContinue = transition.invalidateIfCurrent(generation)
+            synchronized(playbackLock) {
+                if (player === incoming) {
+                    player = null
+                }
+            }
+            incoming?.let(::disposePlayer)
+            Logger.warn(
+                "Radio",
+                "skipping song ${song.id} (${options.index})",
+                err,
+            )
+            if (shouldContinue != null) {
+                removeFailedSong(playTarget, shouldContinue)
+            }
+        }
+    }
+
+    private fun attachPlayerListeners(
+        target: RadioPlayer,
+        generation: Long,
+        options: PlayOptions,
+    ) {
+        target.clearListeners()
+        target.setOnPreparedListener {
+            transition.runIfCurrent(generation) prepared@{
+                if (player !== target) {
+                    return@prepared
+                }
                 options.startPosition?.let {
                     if (it > 0L) {
-                        seek(it)
+                        target.seek(it.toInt())
+                        if (isCurrent(target, generation)) {
+                            onUpdate.dispatch(Events.Player.Seeked)
+                        }
                     }
                 }
-                setSpeed(persistedSpeed, true)
-                setPitch(persistedPitch, true)
-                if (options.autostart) {
-                    start()
+                if (!isCurrent(target, generation)) {
+                    return@prepared
+                }
+                target.changeSpeed(persistedSpeed)
+                onUpdate.dispatch(Events.QueueOption.SpeedChanged)
+                if (!isCurrent(target, generation)) {
+                    return@prepared
+                }
+                target.changePitch(persistedPitch)
+                onUpdate.dispatch(Events.QueueOption.PitchChanged)
+                if (transition.shouldStart(generation)) {
+                    start(target, generation)
                 }
             }
-            player!!.setOnPlaybackPositionListener {
+        }
+        target.setOnPlaybackPositionListener {
+            if (isCurrent(target, generation)) {
                 onPlaybackPositionUpdate.dispatch(it)
             }
-            player!!.setOnFinishListener {
+        }
+        target.setOnFinishListener {
+            transition.runIfCurrent(generation) finished@{
+                if (player !== target) {
+                    return@finished
+                }
                 onSongFinish(SongFinishSource.Finish)
             }
-            player!!.setOnErrorListener { what, extra ->
+        }
+        target.setOnErrorListener { what, extra ->
+            transition.runIfCurrent(generation) failed@{
+                if (player !== target) {
+                    return@failed
+                }
                 Logger.warn(
                     "Radio",
                     "skipping song ${queue.currentSongId} (${queue.currentSongIndex}) due to $what + $extra"
@@ -136,40 +232,81 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
                 when {
                     // happens when change playback params fail, we skip it since its non-critical
                     what == 1 && extra == -22 -> onSongFinish(SongFinishSource.Finish)
-                    else -> {
-                        queue.remove(queue.currentSongIndex)
-                        onSongFinish(SongFinishSource.Exception)
-                    }
+                    else -> removeFailedSong(target.id, transition.playWhenReady)
                 }
             }
-            player!!.prepare()
-            prepareNextPlayer()
-            onUpdate.dispatch(Events.Player.Staged)
-        } catch (err: Exception) {
-            Logger.warn(
-                "Radio",
-                "skipping song ${queue.currentSongId} (${queue.currentSongIndex})",
-                err,
-            )
-            queue.remove(queue.currentSongIndex)
         }
     }
 
     private fun prepareNextPlayer() {
-        if (!symphony.settings.gaplessPlayback.value) {
+        val current = synchronized(playbackLock) { player }
+        if (!symphony.settings.gaplessPlayback.value || current == null) {
+            clearStagedPlayer()
             return
         }
         val (nextSongIndex) = getNextSong(SongFinishSource.Finish)
-        val song = queue.getSongIdAt(nextSongIndex)?.let { symphony.groove.song.get(it) } ?: return
-        if (song.id == nextPlayer?.id) {
+        val song = queue.getSongIdAt(nextSongIndex)?.let { symphony.groove.song.get(it) }
+        if (song == null) {
+            clearStagedPlayer()
             return
         }
+        if (synchronized(playbackLock) {
+                stagedPlayer?.let { it.id == song.id && it.available }
+            } == true
+        ) {
+            return
+        }
+        var candidate: RadioPlayer? = null
         try {
-            nextPlayer?.destroy()
-            nextPlayer = RadioPlayer(symphony, song.id, song.uri).also {
-                it.prepare()
+            val next = RadioPlayer(symphony, song.id, song.uri)
+            candidate = next
+            next.setOnErrorListener { what, extra ->
+                val stillOwned = synchronized(playbackLock) {
+                    if (stagedPlayer === next) {
+                        stagedPlayer = null
+                        true
+                    } else {
+                        false
+                    }
+                }
+                if (!stillOwned) {
+                    return@setOnErrorListener
+                }
+                disposePlayer(next)
+                Logger.warn(
+                    "Radio",
+                    "unable to prepare next player ${song.id} (${nextSongIndex}) due to $what + $extra",
+                )
             }
+            var displaced: RadioPlayer? = null
+            val adopted = synchronized(playbackLock) {
+                val latestNextIndex = getNextSong(SongFinishSource.Finish).first
+                val latestNextSongId = queue.getSongIdAt(latestNextIndex)
+                if (
+                    player !== current ||
+                    !symphony.settings.gaplessPlayback.value ||
+                    latestNextSongId != song.id
+                ) {
+                    false
+                } else {
+                    displaced = stagedPlayer
+                    stagedPlayer = next
+                    true
+                }
+            }
+            if (!adopted) {
+                disposePlayer(next)
+                return
+            }
+            displaced?.takeIf { it !== next }?.let(::disposePlayer)
+            next.prepare()
         } catch (err: Exception) {
+            synchronized(playbackLock) {
+                if (stagedPlayer === candidate) {
+                    stagedPlayer = null
+                }
+            }
+            candidate?.let(::disposePlayer)
             Logger.warn(
                 "Radio",
                 "unable to prepare next player ${song.id} (${nextSongIndex})",
@@ -178,39 +315,50 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
         }
     }
 
-    fun resume() = start()
+    fun resume() {
+        val generation = transition.resume()
+        val target = synchronized(playbackLock) { player }
+        target ?: return
+        start(target, generation)
+    }
 
-    private fun start() {
-        player?.let {
+    private fun start(target: RadioPlayer, generation: Long) {
+        if (!isCurrent(target, generation) || !transition.shouldStart(generation) || !target.usable) {
+            return
+        }
+        // A fresh track start follows the main fade option; a resume additionally
+        // requires the pause/resume fade option.
+        val isResume = target.hasPlayedOnce
+        val shouldFadeIn = PlaybackFade.shouldFade(
+            mainFadeEnabled = target.fadePlayback,
+            fadeOnPauseResume = symphony.settings.fadeOnPauseResume.value,
+            isUserPauseResume = isResume,
+        )
+        transition.startIfReady(generation) {
+            if (player !== target || !target.usable) {
+                return@startIfReady false
+            }
             val hasFocus = focus.requestFocus()
             if (symphony.settings.requireAudioFocus.value && !hasFocus) {
-                return
+                return@startIfReady false
             }
-            // A fresh track start is governed by the main "fade playback" option; a
-            // resume (unpause) additionally requires "fade on pause and resume".
-            // hasPlayedOnce is false only before the very first start() of this
-            // player, so it distinguishes a fresh start from a resume.
-            val isResume = it.hasPlayedOnce
-            val shouldFadeIn = PlaybackFade.shouldFade(
-                mainFadeEnabled = it.fadePlayback,
-                fadeOnPauseResume = symphony.settings.fadeOnPauseResume.value,
-                isUserPauseResume = isResume,
-            )
+            target.cancelVolumeChange()
             if (shouldFadeIn) {
-                it.changeVolumeInstant(RadioPlayer.MIN_VOLUME)
-                it.changeVolume(RadioPlayer.MAX_VOLUME) {}
+                target.changeVolumeInstant(RadioPlayer.MIN_VOLUME)
+                target.changeVolume(RadioPlayer.MAX_VOLUME) {}
             } else {
-                // Guarantee full volume so playback never resumes silently after a
-                // previous fade-out left the volume reduced.
-                it.changeVolumeInstant(RadioPlayer.MAX_VOLUME)
+                target.changeVolumeInstant(RadioPlayer.MAX_VOLUME)
             }
-            it.start()
+            if (!target.start()) {
+                return@startIfReady false
+            }
             onUpdate.dispatch(
                 when {
                     !isResume -> Events.Player.Started
                     else -> Events.Player.Resumed
                 }
             )
+            true
         }
     }
 
@@ -221,52 +369,141 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
             isUserPauseResume = true,
         )
         if (shouldFadeOut) {
-            // We have decided to fade, so force it (the master option is on).
             pause(forceFade = true) {}
         } else {
-            // Immediate pause with no fade-out.
-            player?.let {
-                if (!it.isPlaying) {
-                    return@let
-                }
-                it.pause()
-                focus.abandonFocus()
-                onUpdate.dispatch(Events.Player.Paused)
-            }
+            pauseImmediately(abandonFocus = true)
         }
     }
 
     private fun pause(forceFade: Boolean = false, onFinish: () -> Unit) {
-        player?.let {
-            if (!it.isPlaying) {
-                return@let
-            }
-            it.changeVolume(
-                to = RadioPlayer.MIN_VOLUME,
-                forceFade = forceFade,
-            ) { _ ->
-                it.pause()
-                focus.abandonFocus()
+        val (generation, intentChanged) = transition.pause()
+        val completionDelivered = AtomicBoolean(false)
+        val finishOnce = {
+            if (completionDelivered.compareAndSet(false, true)) {
                 onFinish()
-                onUpdate.dispatch(Events.Player.Paused)
+            }
+        }
+        var completeNow = false
+        var abandonFocus = false
+        var dispatchPaused = false
+        val pauseApplied = transition.runIfPaused(generation) {
+            synchronized(playbackLock) {
+                val outgoing = takeOutgoingPlayer()
+                val stoppedOutgoing = outgoing != null
+                outgoing?.let(::disposePlayer)
+                if (!intentChanged && !stoppedOutgoing) {
+                    completeNow = true
+                } else {
+                    val target = player
+                    if (target == null || !isCurrent(target, generation)) {
+                        completeNow = true
+                        abandonFocus = stoppedOutgoing
+                        dispatchPaused = stoppedOutgoing
+                    } else if (!target.isPlaying) {
+                        target.cancelVolumeChange()
+                        completeNow = true
+                        abandonFocus = true
+                        dispatchPaused = true
+                    } else if (
+                        target.volume == RadioPlayer.MIN_VOLUME ||
+                        symphony.settings.fadePlaybackDuration.value <= 0
+                    ) {
+                        // Avoid a synchronous fader callback while holding playbackLock.
+                        target.cancelVolumeChange()
+                        target.changeVolumeInstant(RadioPlayer.MIN_VOLUME)
+                        target.pause()
+                        completeNow = true
+                        abandonFocus = true
+                        dispatchPaused = true
+                    } else {
+                        target.changeVolume(
+                            to = RadioPlayer.MIN_VOLUME,
+                            forceFade = forceFade,
+                        ) { result ->
+                            if (result == RadioEffects.Fader.Result.Cancelled) {
+                                if (!transition.playWhenReady && !isPlaying) {
+                                    finishOnce()
+                                }
+                                return@changeVolume
+                            }
+                            transition.completePause(generation) {
+                                if (player !== target || !target.pause()) {
+                                    if (!transition.playWhenReady && !isPlaying) {
+                                        finishOnce()
+                                    }
+                                    return@completePause false
+                                }
+                                focus.abandonFocus()
+                                finishOnce()
+                                onUpdate.dispatch(Events.Player.Paused)
+                                true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (!pauseApplied) return
+        if (completeNow) {
+            transition.completePause(generation) {
+                if (abandonFocus) {
+                    focus.abandonFocus()
+                }
+                finishOnce()
+                if (dispatchPaused) {
+                    onUpdate.dispatch(Events.Player.Paused)
+                }
+                true
             }
         }
     }
 
     fun pauseInstant() {
-        player?.let {
-            it.pause()
-            onUpdate.dispatch(Events.Player.Paused)
+        pauseImmediately(abandonFocus = false)
+    }
+
+    private fun pauseImmediately(abandonFocus: Boolean) {
+        val (generation, intentChanged) = transition.pause()
+        transition.runIfPaused(generation) {
+            synchronized(playbackLock) {
+                val outgoing = takeOutgoingPlayer()
+                val stoppedOutgoing = outgoing != null
+                outgoing?.let(::disposePlayer)
+                val target = player
+                val pausedCurrent = target != null && isCurrent(target, generation) && target.pause()
+                if (!intentChanged && !stoppedOutgoing && !pausedCurrent) {
+                    return@synchronized
+                }
+                if (abandonFocus) {
+                    focus.abandonFocus()
+                }
+                onUpdate.dispatch(Events.Player.Paused)
+            }
         }
     }
 
     fun stop(ended: Boolean = true) {
-        stopCurrentSong()
-        queue.reset()
+        var ownedPlayers = emptyList<RadioPlayer>()
+        transition.invalidate {
+            ownedPlayers = synchronized(playbackLock) {
+                val current = player
+                val staged = stagedPlayer
+                player = null
+                stagedPlayer = null
+                val outgoing = takeOutgoingPlayer()
+                linkedSetOf(current, staged, outgoing).filterNotNull()
+            }
+            queue.reset()
+        }
+        ownedPlayers.forEach(::disposePlayer)
+        focus.abandonFocus()
         clearSleepTimer()
         persistedSpeed = RadioPlayer.DEFAULT_SPEED
         persistedPitch = RadioPlayer.DEFAULT_PITCH
-        if (ended) onUpdate.dispatch(Events.Player.Ended)
+        when {
+            ended -> onUpdate.dispatch(Events.Player.Ended)
+            ownedPlayers.isNotEmpty() -> onUpdate.dispatch(Events.Player.Stopped)
+        }
     }
 
     fun jumpTo(index: Int) = play(PlayOptions(index = index))
@@ -354,16 +591,132 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
         onUpdate.dispatch(Events.QueueOption.PauseOnCurrentSongEndChanged)
     }
 
-    private fun stopCurrentSong() {
-        player?.let {
-            player = null
-            it.setOnPlaybackPositionListener {}
-            it.changeVolume(RadioPlayer.MIN_VOLUME) { _ ->
-                it.stop()
+    private fun adoptStagedPlayer(songId: String): RadioPlayer? {
+        val staged = synchronized(playbackLock) {
+            stagedPlayer.also { stagedPlayer = null }
+        }
+        if (staged == null) {
+            return null
+        }
+        staged.clearListeners()
+        return when {
+            staged.id == songId && staged.available -> staged
+            else -> {
+                disposePlayer(staged)
+                null
+            }
+        }
+    }
+
+    private fun clearStagedPlayer() {
+        val staged = synchronized(playbackLock) {
+            stagedPlayer.also { stagedPlayer = null }
+        }
+        staged?.let(::disposePlayer)
+    }
+
+    private fun retirePlayer(retiring: RadioPlayer?, allowFade: Boolean) {
+        if (retiring == null) {
+            return
+        }
+        retiring.clearListeners()
+        if (!allowFade || !retiring.isPlaying) {
+            disposePlayer(retiring)
+            onUpdate.dispatch(Events.Player.Stopped)
+            return
+        }
+        val displaced = synchronized(playbackLock) {
+            val previous = outgoingPlayer
+            outgoingPlayer = retiring
+            previous
+        }
+        if (displaced != null && displaced !== retiring) {
+            disposePlayer(displaced)
+        }
+        retiring.changeVolume(RadioPlayer.MIN_VOLUME) { result ->
+            if (result != RadioEffects.Fader.Result.Completed) {
+                return@changeVolume
+            }
+            val stillOwned = synchronized(playbackLock) {
+                if (outgoingPlayer === retiring) {
+                    outgoingPlayer = null
+                    true
+                } else {
+                    false
+                }
+            }
+            if (stillOwned) {
+                disposePlayer(retiring)
                 onUpdate.dispatch(Events.Player.Stopped)
             }
         }
     }
+
+    private fun takeOutgoingPlayer(): RadioPlayer? = synchronized(playbackLock) {
+        outgoingPlayer.also { outgoingPlayer = null }
+    }
+
+    private fun disposeOutgoingPlayer(): Boolean {
+        val outgoing = takeOutgoingPlayer() ?: return false
+        disposePlayer(outgoing)
+        return true
+    }
+
+    private fun disposePlayer(target: RadioPlayer) {
+        target.clearListeners()
+        target.pause()
+        target.destroy()
+    }
+
+    private fun removeFailedSong(songId: String, shouldContinue: Boolean) {
+        val removedIndex = queue.removeCurrentWithoutPlayback(songId)
+        if (removedIndex != null) {
+            continueAfterRemoval(removedIndex, shouldContinue)
+        }
+    }
+
+    private fun removeFailedSong(target: RadioQueue.PlayTarget, shouldContinue: Boolean) {
+        val removedIndex = queue.removeWithoutPlayback(target)
+            ?: queue.removeSongWithoutPlayback(target.songId, target.preferredIndex)
+        if (removedIndex == null) {
+            restorePlaybackIntent(shouldContinue)
+        } else {
+            continueAfterRemoval(removedIndex, shouldContinue)
+        }
+    }
+
+    private fun continueAfterRemoval(index: Int, shouldContinue: Boolean) {
+        val replacementIndex = replacementIndexAfterRemoval(index, queue.currentQueue.size)
+        if (replacementIndex == null) {
+            onSongFinish(SongFinishSource.Exception)
+        } else {
+            play(
+                PlayOptions(
+                    index = replacementIndex,
+                    autostart = shouldContinue,
+                )
+            )
+        }
+    }
+
+    private fun retryPlayTarget(target: RadioQueue.PlayTarget, shouldContinue: Boolean) {
+        play(
+            PlayOptions(index = target.preferredIndex, autostart = shouldContinue),
+            requestedSongId = target.songId,
+        )
+    }
+
+    private fun restorePlaybackIntent(shouldContinue: Boolean) {
+        if (!hasPlayer) return
+        if (shouldContinue) {
+            resume()
+        } else {
+            pauseImmediately(abandonFocus = true)
+        }
+    }
+
+    private fun isCurrent(target: RadioPlayer, generation: Long) =
+        player === target && transition.isCurrent(generation)
 
     private enum class SongFinishSource {
         Finish,
@@ -371,12 +724,19 @@ class Radio(private val symphony: Symphony) : Symphony.Hooks {
     }
 
     private fun onSongFinish(source: SongFinishSource) {
-        stopCurrentSong()
+        val shouldContinue = transition.playWhenReady
         if (queue.isEmpty()) {
+            transition.invalidate()
+            val finished = player
+            player = null
+            finished?.let(::disposePlayer)
+            clearStagedPlayer()
+            disposeOutgoingPlayer()
             queue.currentSongIndex = -1
             return
         }
         var (nextSongIndex, autostart) = getNextSong(source)
+        autostart = autostart && shouldContinue
         if (pauseOnCurrentSongEnd) {
             autostart = false
             setPauseOnCurrentSongEnd(false)

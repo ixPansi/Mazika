@@ -1,5 +1,5 @@
 {
-    "name": "@zyrouge/symphony-cli",
+    "name": "mazika-cli",
     "version": "0.0.0",
     "private": true,
     "scripts": {
@@ -16,14 +16,11 @@
         "android:move-outputs": "tsx ./cli/android/move-outputs.ts",
         "changelogs:fastlane-character-limit": "tsx ./cli/changelogs/fastlane-character-limit.ts",
         "prebuild": "npm run i18n:build",
+        "build-apk": "node ./scripts/build-apk.mjs",
         "postbuild": "npm run android:move-outputs",
-        "release": "gh workflow run release"
+        "release": "gh workflow run stable.yml"
     },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/zyrouge/symphony.git"
-    },
-    "author": "Zyrouge",
+    "author": "MAZIKA contributors",
     "license": "AGPL-3.0",
     "devDependencies": {
         "@types/archiver": "^6.0.3",

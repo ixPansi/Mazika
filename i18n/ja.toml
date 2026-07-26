@@ -2,16 +2,6 @@ locale = "ja"
 
 [keys]
 UnknownSymbol = "？"
-HelloThere = "こんにちは！"
-IntroductoryMessage = """
-MAZIKAオープンベータをご利用いただきありがとうございます。バグが発生した場合、または改善を提案したい場合は、Githubリポジトリでissueを開いてください。
-
-DiscordおよびRedditコミュニティに参加してフィードバックを共有し、最新情報を入手してください。
-
-MAZIKAは、Github Sponsors、Ko-fi、Patreon経由での寄付によってサポートされています。
-
-改めて、MAZIKAをお試しいただきありがとうございます。
-"""
 Songs = "曲"
 Artists = "アーティスト"
 Albums = "アルバム"
@@ -198,7 +188,6 @@ RenamePlaylist = "プレイリストの名前を変更"
 Rename = "名前を変更"
 Equalizer = "イコライザー"
 LaunchingEqualizerFailedX = "イコライザーの起動に失敗しました（エラー： {x}）"
-ConsiderContributing = "貢献を検討してください！"
 Lyrics = "歌詞"
 LyricsLayout = "歌詞のレイアウト"
 ReplaceArtwork = "アートワークの置き換え"

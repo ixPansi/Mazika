@@ -4,8 +4,8 @@ import android.net.Uri
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,10 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
@@ -37,23 +38,28 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import io.github.zyrouge.symphony.R
 import io.github.zyrouge.symphony.services.AppMeta
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
+import io.github.zyrouge.symphony.ui.components.ScaffoldDialog
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.ui.components.settings.ConsiderContributingTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSimpleTile
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.settings.AndroidAutoSettingsViewRoute
@@ -79,6 +85,13 @@ data class SettingsViewRoute(val initialElement: String? = null) {
 fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
     val configuration = LocalConfiguration.current
     val scrollState = rememberScrollState()
+    var showAboutDialog by remember { mutableStateOf(false) }
+    val updateState by AppMeta.updateState.collectAsState()
+    val availableRelease = if (AppMeta.canCheckForUpdates) {
+        (updateState as? AppMeta.UpdateState.Available)?.release
+    } else {
+        null
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -113,7 +126,6 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
                     .fillMaxSize()
             ) {
                 Column(modifier = Modifier.verticalScroll(scrollState)) {
-                    ConsiderContributingTile(context)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size((configuration.smallestScreenWidthDp * 0.25).dp)) {
                             // MAZIKA: the in-app logo is tinted with the active theme
@@ -128,60 +140,22 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
                             Text(AppMeta.appName, style = MaterialTheme.typography.titleMedium)
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(AppMeta.version, style = MaterialTheme.typography.labelMedium)
-                            AppMeta.latestVersion?.takeIf { AppMeta.version != it }?.let {
+                            availableRelease?.let { release ->
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
-                                    context.symphony.t.NewVersionAvailableX(it),
+                                    context.symphony.t.NewVersionAvailableX(release.tag),
+                                    modifier = Modifier.clickable {
+                                        ActivityUtils.startBrowserActivity(
+                                            context.activity,
+                                            Uri.parse(release.htmlUrl),
+                                        )
+                                    },
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         color = MaterialTheme.colorScheme.primary,
                                     ),
                                 )
                             }
                         }
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                    ) {
-                        LinkChip(
-                            context,
-                            icon = Icons.Filled.BugReport,
-                            label = context.symphony.t.ReportAnIssue,
-                            url = AppMeta.githubIssuesUrl,
-                        )
-                        LinkChip(
-                            context,
-                            icon = Icons.Filled.Code,
-                            label = context.symphony.t.Github,
-                            url = AppMeta.githubRepositoryUrl,
-                        )
-                        LinkChip(
-                            context,
-                            label = context.symphony.t.Discord,
-                            url = AppMeta.discordUrl,
-                        )
-                        LinkChip(
-                            context,
-                            label = context.symphony.t.Reddit,
-                            url = AppMeta.redditUrl,
-                        )
-                        LinkChip(
-                            context,
-                            label = context.symphony.t.PlayStore,
-                            url = AppMeta.playStoreUrl,
-                        )
-                        LinkChip(
-                            context,
-                            label = context.symphony.t.FDroid,
-                            url = AppMeta.fdroidUrl,
-                        )
-                        LinkChip(
-                            context,
-                            label = context.symphony.t.IzzyOnDroid,
-                            url = AppMeta.izzyOnDroidUrl,
-                        )
                     }
                     HorizontalDivider()
                     SettingsSimpleTile(
@@ -269,16 +243,72 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
                             context.navController.navigate(NowPlayingSettingsViewRoute)
                         },
                     )
+                    if (AppMeta.canCheckForUpdates) {
+                        HorizontalDivider()
+                        SettingsSimpleTile(
+                            icon = {
+                                Icon(Icons.Filled.Update, null)
+                            },
+                            title = {
+                                Text(context.symphony.t.Updates)
+                            },
+                            onClick = {
+                                context.navController.navigate(UpdateSettingsViewRoute)
+                            },
+                        )
+                    }
+                    // MAZIKA is a fork of Symphony and ships under the AGPL-3.0, which
+                    // requires the licence terms and the absence of warranty to be
+                    // discoverable from the app itself, not just the repository. The
+                    // About chip carries that notice.
                     HorizontalDivider()
-                    SettingsSimpleTile(
-                        icon = {
-                            Icon(Icons.Filled.Update, null)
-                        },
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(16.dp),
+                    ) {
+                        SettingsChip(
+                            icon = Icons.Filled.Info,
+                            label = context.symphony.t.About,
+                        ) {
+                            showAboutDialog = true
+                        }
+                        LinkChip(
+                            context,
+                            icon = Icons.Filled.Code,
+                            label = context.symphony.t.SourceCode,
+                            url = AppMeta.sourceCodeUrl,
+                        )
+                        LinkChip(
+                            context,
+                            icon = Icons.Filled.Gavel,
+                            label = context.symphony.t.License,
+                            url = AppMeta.licenseUrl,
+                        )
+                    }
+                }
+
+                if (showAboutDialog) {
+                    ScaffoldDialog(
                         title = {
-                            Text(context.symphony.t.Updates)
+                            Text(context.symphony.t.About)
                         },
-                        onClick = {
-                            context.navController.navigate(UpdateSettingsViewRoute)
+                        content = {
+                            Box(modifier = Modifier.padding(20.dp, 16.dp)) {
+                                Text(
+                                    context.symphony.t.AboutNotice,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        },
+                        actions = {
+                            TextButton(onClick = { showAboutDialog = false }) {
+                                Text(context.symphony.t.Done)
+                            }
+                        },
+                        onDismissRequest = {
+                            showAboutDialog = false
                         },
                     )
                 }
@@ -287,19 +317,20 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
     )
 }
 
+// MAZIKA: restored from upstream Symphony, where the About links were compact chips
+// rather than full-width tiles printing their own URL.
 @Composable
-private fun LinkChip(context: ViewContext, icon: ImageVector? = null, label: String, url: String) {
+private fun SettingsChip(
+    icon: ImageVector? = null,
+    label: String,
+    onClick: () -> Unit,
+) {
     Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant,
-                RoundedCornerShape(4.dp),
-            )
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
             .clip(RoundedCornerShape(4.dp))
-            .clickable {
-                ActivityUtils.startBrowserActivity(context.activity, Uri.parse(url))
-            }
+            .clickable(onClick = onClick)
             .padding(6.dp, 4.dp),
     ) {
         icon?.let {
@@ -313,4 +344,14 @@ private fun LinkChip(context: ViewContext, icon: ImageVector? = null, label: Str
         }
         Text(label, style = MaterialTheme.typography.labelLarge)
     }
+}
+
+@Composable
+private fun LinkChip(
+    context: ViewContext,
+    icon: ImageVector? = null,
+    label: String,
+    url: String,
+) = SettingsChip(icon, label) {
+    ActivityUtils.startBrowserActivity(context.activity, Uri.parse(url))
 }

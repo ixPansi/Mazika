@@ -1,19 +1,29 @@
 package io.github.zyrouge.symphony.ui.view
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -24,8 +34,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import io.github.zyrouge.symphony.ui.components.AnimatedNowPlayingBottomBar
 import io.github.zyrouge.symphony.ui.components.IconTextBody
 import io.github.zyrouge.symphony.ui.components.PlaylistDropdownMenu
@@ -35,7 +48,6 @@ import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
 import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.theme.ThemeColors
-import io.github.zyrouge.symphony.utils.mutate
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -57,6 +69,7 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
         derivedStateOf { allPlaylistIds.contains(route.playlistId) }
     }
     var showOptionsMenu by remember { mutableStateOf(false) }
+    var isReordering by remember(route.playlistId) { mutableStateOf(false) }
     val isFavoritesPlaylist by remember(playlist) {
         derivedStateOf {
             playlist?.let { context.symphony.groove.playlist.isFavoritesPlaylist(it) } == true
@@ -98,6 +111,7 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
                                 context,
                                 playlist!!,
                                 expanded = showOptionsMenu,
+                                includeShufflePlay = false,
                                 onSongsChanged = {
                                     incrementUpdateCounter()
                                 },
@@ -129,17 +143,26 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
                     isViable -> SongList(
                         context,
                         songIds = songIds,
+                        trailingContent = {
+                            item { Spacer(modifier = Modifier.height(72.dp)) }
+                        },
                         type = SongListType.Playlist,
                         disableHeartIcon = isFavoritesPlaylist,
+                        showShufflePlay = false,
                         playSource = PlaySource.playlist(route.playlistId),
-                        // MAZIKA: drag the handle to reorder; persisted on release.
-                        onReorder = { orderedSongIds ->
-                            playlist?.let {
-                                context.symphony.groove.playlist.update(it.id, orderedSongIds)
-                                incrementUpdateCounter()
+                        // MAZIKA: long-press a row to reorder; persisted on release.
+                        onReorder = if (playlist?.isNotLocal == true) {
+                            { orderedSongIds ->
+                                playlist?.let {
+                                    context.symphony.groove.playlist.update(it.id, orderedSongIds)
+                                    incrementUpdateCounter()
+                                }
                             }
+                        } else {
+                            null
                         },
-                        trailingOptionsContent = { _, song, onDismissRequest ->
+                        onReorderStateChange = { isReordering = it },
+                        trailingOptionsContent = { _, sourceIndex, song, onDismissRequest ->
                             playlist?.takeIf { it.isNotLocal }?.let {
                                 DropdownMenuItem(
                                     leadingIcon = {
@@ -154,10 +177,14 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
                                     },
                                     onClick = {
                                         onDismissRequest()
-                                        context.symphony.groove.playlist.update(
-                                            it.id,
-                                            songIds.mutate { remove(song.id) },
-                                        )
+                                        if (sourceIndex in songIds.indices) {
+                                            context.symphony.groove.playlist.update(
+                                                it.id,
+                                                songIds.toMutableList().apply {
+                                                    removeAt(sourceIndex)
+                                                },
+                                            )
+                                        }
                                     }
                                 )
                             }
@@ -168,10 +195,90 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
                 }
             }
         },
+        floatingActionButton = {
+            playlist?.takeIf { isViable }?.let { currentPlaylist ->
+                PlaylistPlaybackControls(
+                    context = context,
+                    enabled = songIds.isNotEmpty() && !isReordering,
+                    onPlayAll = {
+                        context.symphony.radio.shorty.playQueue(
+                            currentPlaylist.getSortedSongIds(context.symphony),
+                            source = PlaySource.playlist(currentPlaylist.id),
+                        )
+                    },
+                    onShuffle = {
+                        context.symphony.radio.shorty.playQueue(
+                            currentPlaylist.getSortedSongIds(context.symphony),
+                            shuffle = true,
+                            source = PlaySource.playlist(currentPlaylist.id),
+                        )
+                    },
+                )
+            }
+        },
         bottomBar = {
             AnimatedNowPlayingBottomBar(context)
         }
     )
+}
+
+@Composable
+private fun PlaylistPlaybackControls(
+    context: ViewContext,
+    enabled: Boolean,
+    onPlayAll: () -> Unit,
+    onShuffle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.graphicsLayer {
+            alpha = if (enabled) 1f else 0.42f
+        },
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            onClick = onShuffle,
+            enabled = enabled,
+            modifier = Modifier.size(40.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            tonalElevation = 1.dp,
+            shadowElevation = 3.dp,
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Shuffle,
+                    context.symphony.t.ShufflePlay,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+        }
+        Surface(
+            onClick = onPlayAll,
+            enabled = enabled,
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.86f),
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            tonalElevation = 1.dp,
+            shadowElevation = 4.dp,
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.PlayArrow,
+                    context.symphony.t.PlayAll,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -157,6 +157,7 @@ fun PlaylistDropdownMenu(
     context: ViewContext,
     playlist: Playlist,
     expanded: Boolean,
+    includeShufflePlay: Boolean = true,
     onSongsChanged: (() -> Unit) = {},
     onRename: (() -> Unit) = {},
     onDelete: (() -> Unit) = {},
@@ -208,22 +209,24 @@ fun PlaylistDropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest
     ) {
-        DropdownMenuItem(
-            leadingIcon = {
-                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null)
-            },
-            text = {
-                Text(context.symphony.t.ShufflePlay)
-            },
-            onClick = {
-                onDismissRequest()
-                context.symphony.radio.shorty.playQueue(
-                    playlist.getSortedSongIds(context.symphony),
-                    shuffle = true,
-                    source = PlaySource.playlist(playlist.id),
-                )
-            }
-        )
+        if (includeShufflePlay) {
+            DropdownMenuItem(
+                leadingIcon = {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null)
+                },
+                text = {
+                    Text(context.symphony.t.ShufflePlay)
+                },
+                onClick = {
+                    onDismissRequest()
+                    context.symphony.radio.shorty.playQueue(
+                        playlist.getSortedSongIds(context.symphony),
+                        shuffle = true,
+                        source = PlaySource.playlist(playlist.id),
+                    )
+                }
+            )
+        }
         DropdownMenuItem(
             leadingIcon = {
                 Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null)

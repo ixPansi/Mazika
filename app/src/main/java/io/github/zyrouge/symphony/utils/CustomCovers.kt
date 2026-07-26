@@ -7,6 +7,8 @@ import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import io.github.zyrouge.symphony.Symphony
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
@@ -31,6 +33,7 @@ object CustomCovers {
     const val SONG_DIRECTORY = "song_covers"
     const val MAX_SIZE = 1024
     private const val QUALITY = 85
+    internal const val RETIRED_COVER_GRACE_MS = 10 * 60 * 1000L
 
     fun coversDir(context: Context, directory: String = PLAYLIST_DIRECTORY): File =
         File(context.filesDir, directory)
@@ -161,6 +164,27 @@ object CustomCovers {
         }
     }
 
+    /**
+     * Retains a replaced cover briefly because Android Auto may resolve a previously
+     * published content URI after the new queue or browse result has arrived.
+     */
+    fun deleteAfterGracePeriod(
+        symphony: Symphony,
+        name: String?,
+        directory: String = PLAYLIST_DIRECTORY,
+    ) {
+        if (name.isNullOrBlank()) return
+        val file = resolveFile(symphony, name, directory)
+        if (!file.exists()) return
+        // The modified time records retirement too, so startup orphan cleanup honors
+        // the same grace period if the process exits before the delayed job runs.
+        runCatching { file.setLastModified(System.currentTimeMillis()) }
+        symphony.groove.coroutineScope.launch {
+            delay(RETIRED_COVER_GRACE_MS)
+            delete(symphony, name, directory)
+        }
+    }
+
     /** Removes stored cover files that are no longer referenced by any playlist. */
     fun cleanupOrphans(
         symphony: Symphony,
@@ -170,8 +194,12 @@ object CustomCovers {
         runCatching {
             val dir = coversDir(symphony.applicationContext, directory)
             if (!dir.isDirectory) return
+            val now = System.currentTimeMillis()
             dir.listFiles()?.forEach { file ->
-                if (file.name !in referencedNames) {
+                if (
+                    file.name !in referencedNames &&
+                    isPastDeletionGracePeriod(file.lastModified(), now)
+                ) {
                     file.delete()
                 }
             }
@@ -181,6 +209,9 @@ object CustomCovers {
     }
 
     internal fun sanitizeId(id: String) = id.replace(Regex("[^A-Za-z0-9_-]"), "_")
+
+    internal fun isPastDeletionGracePeriod(lastModified: Long, now: Long): Boolean =
+        lastModified <= now - RETIRED_COVER_GRACE_MS
 
     internal fun calculateInSampleSize(width: Int, height: Int, target: Int): Int {
         var sample = 1

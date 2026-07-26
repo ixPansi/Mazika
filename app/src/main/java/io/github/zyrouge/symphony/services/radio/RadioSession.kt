@@ -19,10 +19,15 @@ import androidx.activity.result.contract.ActivityResultContract
 import io.github.zyrouge.symphony.R
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.services.groove.Song
+import io.github.zyrouge.symphony.utils.Eventer
 import io.github.zyrouge.symphony.utils.Logger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 class RadioSession(val symphony: Symphony) {
     data class UpdateRequest(
@@ -40,15 +45,13 @@ class RadioSession(val symphony: Symphony) {
     // MAZIKA: resolves Android Auto browse/search media ids onto the shared engine.
     private val browser by lazy { RadioBrowser(symphony) }
 
-    /**
-     * MAZIKA: package name of the browser client currently connected (Android Auto,
-     * Assistant, …), recorded by [RadioBrowserService.onGetRoot]. Queue artwork is sent
-     * as content URIs, and the receiving process needs read permission for them - unlike
-     * browse results, queue items never pass through the service, so they miss its
-     * per-item grant. Null until something connects, in which case no grant is needed.
-     */
-    @Volatile
-    internal var browserClientPackage: String? = null
+    // MediaBrowserServiceCompat has no disconnect callback that identifies a client,
+    // so retain every validated package seen by onGetRoot for this process lifetime.
+    private val browserClientPackages = ConcurrentHashMap.newKeySet<String>()
+    internal val onBrowseChildrenChanged = Eventer<Set<String>>()
+    private val updateSequence = AtomicLong()
+    private val queueUpdateSequence = AtomicLong()
+    private var seekSettingsJob: Job? = null
 
     /**
      * MAZIKA: search-and-play entry point shared by the media session callback and the
@@ -56,7 +59,6 @@ class RadioSession(val symphony: Symphony) {
      */
     fun playFromSearch(query: String?) = browser.playFromSearch(query)
 
-    private var currentSongId: String? = null
     private var receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             intent?.action?.let { action ->
@@ -98,12 +100,15 @@ class RadioSession(val symphony: Symphony) {
             object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
                     super.onPlay()
-                    handleAction(ACTION_PLAY_PAUSE)
+                    val radio = symphony.radio
+                    if (radio.hasPlayer && (!radio.playWhenReady || !radio.isPlaying)) {
+                        radio.resume()
+                    }
                 }
 
                 override fun onPause() {
                     super.onPause()
-                    handleAction(ACTION_PLAY_PAUSE)
+                    symphony.radio.pause()
                 }
 
                 override fun onSkipToPrevious() {
@@ -231,6 +236,17 @@ class RadioSession(val symphony: Symphony) {
                 else -> {}
             }
         }
+        seekSettingsJob?.cancel()
+        seekSettingsJob = symphony.groove.coroutineScope.launch {
+            combine(
+                symphony.settings.seekBackDuration.flow,
+                symphony.settings.seekForwardDuration.flow,
+            ) { _, _ -> Unit }.collect {
+                withContext(Dispatchers.Main) {
+                    refreshPlaybackState()
+                }
+            }
+        }
     }
 
     fun handleAction(action: String) {
@@ -249,18 +265,47 @@ class RadioSession(val symphony: Symphony) {
      */
     fun refreshArtwork(songId: String) {
         artworkCacher.invalidate(songId)
+        updateQueue()
         if (symphony.radio.queue.currentSongId == songId) {
             update()
         }
+        symphony.groove.coroutineScope.launch {
+            onBrowseChildrenChanged.dispatch(browser.artworkParentsForSong(songId))
+        }
+    }
+
+    /** Republishes Auto surfaces whose playlist artwork may have changed. */
+    fun refreshPlaylistArtwork(playlistId: String) {
+        updateQueue()
+        onBrowseChildrenChanged.dispatch(
+            setOf(
+                MediaId.CATEGORY_PLAYLISTS,
+                MediaId.of(MediaId.TYPE_PLAYLIST, playlistId),
+            )
+        )
+    }
+
+    /** Grants a newly connected browser access before it receives an existing queue. */
+    internal fun registerBrowserClient(packageName: String) {
+        browserClientPackages.add(packageName)
+        grantArtworkAccess(packageName)
+        updateQueue()
     }
 
     fun cancel() {
+        updateSequence.incrementAndGet()
+        queueUpdateSequence.incrementAndGet()
+        runCatching { mediaSession.setQueue(emptyList()) }
+            .onFailure { Logger.warn("RadioSession", "unable to clear published queue: $it") }
         notification.cancel()
         mediaSession.isActive = false
     }
 
     fun destroy() {
+        seekSettingsJob?.cancel()
+        seekSettingsJob = null
         cancel()
+        revokeArtworkAccess()
         symphony.applicationContext.unregisterReceiver(receiver)
     }
 
@@ -288,9 +333,11 @@ class RadioSession(val symphony: Symphony) {
      * onSkipToQueueItem receives back.
      */
     private fun updateQueue() {
+        val requestSequence = queueUpdateSequence.incrementAndGet()
+        val queueSnapshot = symphony.radio.queue.currentQueue.toList()
         symphony.groove.coroutineScope.launch {
-            grantArtworkAccessToBrowserClient()
-            val items = symphony.radio.queue.currentQueue
+            grantArtworkAccessToBrowserClients()
+            val items = queueSnapshot
                 .take(MAX_QUEUE_ITEMS)
                 .mapIndexedNotNull { index, songId ->
                     val song = symphony.groove.song.get(songId) ?: return@mapIndexedNotNull null
@@ -300,11 +347,12 @@ class RadioSession(val symphony: Symphony) {
                         .setSubtitle(song.artists.joinToString().ifEmpty { null })
                         // Artwork as a content URI, never a bitmap: 200 bitmaps in one
                         // queue parcel is a guaranteed TransactionTooLargeException.
-                        .apply { browser.artworkUriFor(songId)?.let { setIconUri(it) } }
+                        .setIconUri(symphony.radio.artworkUris.song(songId))
                         .build()
                     MediaSessionCompat.QueueItem(description, index.toLong())
                 }
             withContext(Dispatchers.Main) {
+                if (requestSequence != queueUpdateSequence.get()) return@withContext
                 runCatching {
                     mediaSession.setQueue(items)
                     mediaSession.setQueueTitle(symphony.t.Queue)
@@ -316,15 +364,18 @@ class RadioSession(val symphony: Symphony) {
     }
 
     /**
-     * Lets the connected browser client read the two artwork directories.
+     * Lets connected browser clients read the artwork directories.
      *
-     * Two prefix grants rather than one grant per queue item: a 200-song queue would
+     * Prefix grants rather than one grant per queue item: a 200-song queue would
      * otherwise mean 200 binder calls on every queue change. The provider itself stays
      * unexported, read-only and path-validated, so the widened scope is still just
-     * "the cover images this app owns", handed to the one client that asked to browse.
+     * "the cover images this app owns", handed to each client that asked to browse.
      */
-    private fun grantArtworkAccessToBrowserClient() {
-        val client = browserClientPackage ?: return
+    private fun grantArtworkAccessToBrowserClients() {
+        browserClientPackages.forEach(::grantArtworkAccess)
+    }
+
+    private fun grantArtworkAccess(client: String) {
         val context = symphony.applicationContext
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
                 Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
@@ -337,24 +388,34 @@ class RadioSession(val symphony: Symphony) {
         }
     }
 
+    private fun revokeArtworkAccess() {
+        val context = symphony.applicationContext
+        ArtworkProvider.artworkRootUris(context).forEach { uri ->
+            runCatching {
+                context.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+                .onFailure {
+                    Logger.warn("RadioSession", "unable to revoke artwork access for $uri: $it")
+                }
+        }
+        browserClientPackages.clear()
+    }
+
     private fun update() {
+        val requestSequence = updateSequence.incrementAndGet()
         symphony.groove.coroutineScope.launch {
-            updateAsync()
+            updateAsync(requestSequence)
         }
     }
 
-    private suspend fun updateAsync() {
+    private suspend fun updateAsync(requestSequence: Long) {
         val song = symphony.radio.queue.currentSongId
             ?.let { symphony.groove.song.get(it) } ?: return
-        currentSongId = song.id
         val artworkUri = symphony.groove.song.getArtworkUri(song.id)
         val artworkBitmap = artworkCacher.getArtwork(song)
         val playbackPosition = symphony.radio.currentPlaybackPosition
             ?: RadioPlayer.PlaybackPosition(played = 0L, total = song.duration)
         val isPlaying = symphony.radio.isPlaying
-        if (currentSongId != song.id) {
-            return
-        }
         val req = UpdateRequest(
             song = song,
             artworkUri = artworkUri,
@@ -362,79 +423,106 @@ class RadioSession(val symphony: Symphony) {
             playbackPosition = playbackPosition,
             isPlaying = isPlaying,
         )
-        updateSession(req)
-        notification.update(req)
+        withContext(Dispatchers.Main) {
+            if (
+                requestSequence != updateSequence.get() ||
+                symphony.radio.queue.currentSongId != song.id
+            ) {
+                return@withContext
+            }
+            updateSession(req)
+            notification.update(req)
+        }
     }
 
     private fun updateSession(req: UpdateRequest) {
         ensureEnabled()
-        mediaSession.run {
-            setMetadata(
-                MediaMetadataCompat.Builder().run {
-                    putString(MediaMetadataCompat.METADATA_KEY_TITLE, req.song.title)
-                    if (req.song.artists.isNotEmpty()) {
-                        putString(
-                            MediaMetadataCompat.METADATA_KEY_ARTIST,
-                            req.song.artists.joinToString()
-                        )
-                    }
-                    putString(MediaMetadataCompat.METADATA_KEY_ALBUM, req.song.album)
-                    req.artworkBitmap.let {
-                        putBitmap(MediaMetadataCompat.METADATA_KEY_ART, it)
-                        putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
-                        putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, it)
-                    }
-                    putLong(
-                        MediaMetadataCompat.METADATA_KEY_DURATION,
-                        req.playbackPosition.total.toLong()
+        mediaSession.setMetadata(
+            MediaMetadataCompat.Builder().run {
+                putString(MediaMetadataCompat.METADATA_KEY_TITLE, req.song.title)
+                if (req.song.artists.isNotEmpty()) {
+                    putString(
+                        MediaMetadataCompat.METADATA_KEY_ARTIST,
+                        req.song.artists.joinToString()
                     )
-                    build()
                 }
-            )
-            setPlaybackState(
-                PlaybackStateCompat.Builder().run {
-                    setState(
-                        when {
-                            req.isPlaying -> PlaybackStateCompat.STATE_PLAYING
-                            else -> PlaybackStateCompat.STATE_PAUSED
-                        },
-                        req.playbackPosition.played.toLong(),
-                        1f
-                    )
-                    setActions(
-                        PlaybackStateCompat.ACTION_PLAY
-                                or PlaybackStateCompat.ACTION_PAUSE
-                                or PlaybackStateCompat.ACTION_PLAY_PAUSE
-                                or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-                                or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-                                or PlaybackStateCompat.ACTION_STOP
-                                or PlaybackStateCompat.ACTION_REWIND
-                                or PlaybackStateCompat.ACTION_FAST_FORWARD
-                                or PlaybackStateCompat.ACTION_SEEK_TO
-                                // MAZIKA: enable Android Auto / voice playback.
-                                or PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
-                                or PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
-                                or PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID
-                                or PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM
-                    )
-                    addCustomAction(
-                        PlaybackStateCompat.CustomAction.Builder(
-                            ACTION_SEEK_BACK,
-                            symphony.t.XSecs("-${symphony.settings.seekBackDuration.value}"),
-                            R.drawable.material_icon_fast_rewind,
-                        ).build()
-                    )
-                    addCustomAction(
-                        PlaybackStateCompat.CustomAction.Builder(
-                            ACTION_SEEK_FORWARD,
-                            symphony.t.XSecs("+${symphony.settings.seekForwardDuration.value}"),
-                            R.drawable.material_icon_fast_forward,
-                        ).build()
-                    )
-                    build()
+                putString(MediaMetadataCompat.METADATA_KEY_ALBUM, req.song.album)
+                req.artworkBitmap.let {
+                    putBitmap(MediaMetadataCompat.METADATA_KEY_ART, it)
+                    putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
+                    putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, it)
                 }
-            )
+                putLong(
+                    MediaMetadataCompat.METADATA_KEY_DURATION,
+                    req.playbackPosition.total.toLong()
+                )
+                build()
+            }
+        )
+        updatePlaybackState(req.playbackPosition, req.isPlaying)
+    }
+
+    private fun refreshPlaybackState() {
+        if (!symphony.radio.hasPlayer) {
+            return
         }
+        val song = symphony.radio.queue.currentSongId
+            ?.let { symphony.groove.song.get(it) } ?: return
+        updatePlaybackState(
+            symphony.radio.currentPlaybackPosition
+                ?: RadioPlayer.PlaybackPosition(played = 0L, total = song.duration),
+            symphony.radio.isPlaying,
+        )
+    }
+
+    private fun updatePlaybackState(
+        playbackPosition: RadioPlayer.PlaybackPosition,
+        isPlaying: Boolean,
+    ) {
+        ensureEnabled()
+        mediaSession.setPlaybackState(
+            PlaybackStateCompat.Builder().run {
+                setState(
+                    when {
+                        isPlaying -> PlaybackStateCompat.STATE_PLAYING
+                        else -> PlaybackStateCompat.STATE_PAUSED
+                    },
+                    playbackPosition.played.toLong(),
+                    1f
+                )
+                setActions(
+                    PlaybackStateCompat.ACTION_PLAY
+                            or PlaybackStateCompat.ACTION_PAUSE
+                            or PlaybackStateCompat.ACTION_PLAY_PAUSE
+                            or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                            or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                            or PlaybackStateCompat.ACTION_STOP
+                            or PlaybackStateCompat.ACTION_REWIND
+                            or PlaybackStateCompat.ACTION_FAST_FORWARD
+                            or PlaybackStateCompat.ACTION_SEEK_TO
+                            // MAZIKA: enable Android Auto / voice playback.
+                            or PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
+                            or PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
+                            or PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID
+                            or PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM
+                )
+                addCustomAction(
+                    PlaybackStateCompat.CustomAction.Builder(
+                        ACTION_SEEK_BACK,
+                        symphony.t.XSecs("-${symphony.settings.seekBackDuration.value}"),
+                        R.drawable.material_icon_fast_rewind,
+                    ).build()
+                )
+                addCustomAction(
+                    PlaybackStateCompat.CustomAction.Builder(
+                        ACTION_SEEK_FORWARD,
+                        symphony.t.XSecs("+${symphony.settings.seekForwardDuration.value}"),
+                        R.drawable.material_icon_fast_forward,
+                    ).build()
+                )
+                build()
+            }
+        )
     }
 
     private fun ensureEnabled() {

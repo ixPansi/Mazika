@@ -3,12 +3,6 @@ name = "UnknownSymbol"
 description = "Symbol to represent unknown things"
 
 [[keys]]
-name = "HelloThere"
-
-[[keys]]
-name = "IntroductoryMessage"
-
-[[keys]]
 name = "Songs"
 
 [[keys]]
@@ -650,9 +644,6 @@ name = "LaunchingEqualizerFailedX"
 parameters = ["x"]
 
 [[keys]]
-name = "ConsiderContributing"
-
-[[keys]]
 name = "Lyrics"
 
 [[keys]]
@@ -819,3 +810,12 @@ name = "KeepScreenAwakeOnLyrics"
 
 [[keys]]
 name = "MinSongDurationFilter"
+
+[[keys]]
+name = "SourceCode"
+
+[[keys]]
+name = "License"
+
+[[keys]]
+name = "AboutNotice"

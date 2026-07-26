@@ -2,16 +2,6 @@ locale = "vi"
 
 [keys]
 UnknownSymbol = "?"
-HelloThere = "Chào đằng ấy!"
-IntroductoryMessage = """
-Cảm ơn bạn vì đã tham gia open beta của MAZIKA. Nếu bạn gặp bất kỳ bug nào hoặc muốn đề xuất cải tiến, vui lòng mở issue trong Repo Github của chúng tôi.
-
-Tham gia cộng đồng Discord và Reddit của chúng tôi để chia sẻ phản hồi của bạn và để nhận được thông tin mới nhất về ứng dụng.
-
-MAZIKA hoàn toàn miễn phí và được hỗ trợ hoàn toàn bởi sự đóng góp của những người tốt bụng. Mọi sự đóng góp đều sẽ được ghi nhận.
-
-Một lần nữa, cảm ơn bạn vì đã dùng thử MAZIKA!
-"""
 Songs = "Bài hát"
 Artists = "Nghệ sĩ"
 Albums = "Album"
@@ -198,7 +188,6 @@ RenamePlaylist = "Đổi tên danh sách phát"
 Rename = "Đổi tên danh sách phát"
 Equalizer = "Bộ chỉnh âm"
 LaunchingEqualizerFailedX = "Khởi chạy bộ chỉnh âm thất bại (Lỗi: {x})"
-ConsiderContributing = "Hãy cân nhắc đóng góp!"
 Lyrics = "Lời bài hát"
 LyricsLayout = "Mục lời bài hát"
 ReplaceArtwork = "Thay thế bìa bài hát"

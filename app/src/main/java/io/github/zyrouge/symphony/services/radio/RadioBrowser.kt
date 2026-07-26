@@ -1,6 +1,5 @@
 package io.github.zyrouge.symphony.services.radio
 
-import android.net.Uri
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import io.github.zyrouge.symphony.Symphony
@@ -17,8 +16,6 @@ import io.github.zyrouge.symphony.utils.SimplePath
  * with the phone and respects the pause/resume fade preference.
  */
 class RadioBrowser(private val symphony: Symphony) {
-    private val context get() = symphony.applicationContext
-
     // MAZIKA: the root screen follows the user's configured category order
     // (Settings -> Android Auto), falling back to the default order if they have
     // somehow disabled everything - an empty root would look like a broken app.
@@ -302,31 +299,33 @@ class RadioBrowser(private val symphony: Symphony) {
             .setMediaId(MediaId.of(MediaId.TYPE_SONG, songId, contextType, contextId))
             .setTitle(song.title)
             .setSubtitle(song.artists.joinToString().ifEmpty { null })
-            .apply { songArtworkUri(song.id, song.coverFile)?.let { setIconUri(it) } }
+            .setIconUri(symphony.radio.artworkUris.song(song.id))
             .build()
         return MediaItem(description, MediaItem.FLAG_PLAYABLE)
     }
 
     private fun albumItem(albumId: String): MediaItem? {
         val album = symphony.groove.album.get(albumId) ?: return null
-        val firstCover = symphony.groove.album.getSongIds(albumId).firstOrNull()
-            ?.let { symphony.groove.song.get(it)?.coverFile }
         val description = MediaDescriptionCompat.Builder()
             .setMediaId(MediaId.of(MediaId.TYPE_ALBUM, albumId))
             .setTitle(album.name)
             .setSubtitle(album.artists.joinToString().ifEmpty { null })
-            .apply { coversUri(firstCover)?.let { setIconUri(it) } }
+            .setIconUri(
+                symphony.radio.artworkUris.firstSong(symphony.groove.album.getSongIds(albumId))
+            )
             .build()
         return MediaItem(description, MediaItem.FLAG_BROWSABLE)
     }
 
     private fun artistItem(artistName: String): MediaItem {
-        val firstCover = symphony.groove.artist.getSongIds(artistName).firstOrNull()
-            ?.let { symphony.groove.song.get(it)?.coverFile }
         val description = MediaDescriptionCompat.Builder()
             .setMediaId(MediaId.of(MediaId.TYPE_ARTIST, artistName))
             .setTitle(artistName)
-            .apply { coversUri(firstCover)?.let { setIconUri(it) } }
+            .setIconUri(
+                symphony.radio.artworkUris.firstSong(
+                    symphony.groove.artist.getSongIds(artistName)
+                )
+            )
             .build()
         return MediaItem(description, MediaItem.FLAG_BROWSABLE)
     }
@@ -335,7 +334,7 @@ class RadioBrowser(private val symphony: Symphony) {
         val description = MediaDescriptionCompat.Builder()
             .setMediaId(MediaId.of(MediaId.TYPE_PLAYLIST, playlist.id))
             .setTitle(playlist.title)
-            .apply { playlistIconUri(playlist)?.let { setIconUri(it) } }
+            .setIconUri(symphony.radio.artworkUris.playlist(playlist))
             .build()
         return MediaItem(description, MediaItem.FLAG_BROWSABLE)
     }
@@ -356,34 +355,31 @@ class RadioBrowser(private val symphony: Symphony) {
         return MediaItem(description, MediaItem.FLAG_BROWSABLE)
     }
 
-    // --- artwork uris -----------------------------------------------------------
-
-    private fun coversUri(coverFile: String?): Uri? =
-        coverFile?.let { ArtworkProvider.coversUri(context, it) }
-
-    /** A song's custom cover if it has one, else its embedded artwork. */
-    private fun songArtworkUri(songId: String, coverFile: String?): Uri? =
-        symphony.groove.song.getCustomCoverFile(songId)
-            ?.let { ArtworkProvider.songCoverUri(context, it) }
-            ?: coversUri(coverFile)
-
-    /**
-     * Artwork for a song by id, using the same precedence as the browse tree. Shared
-     * with [RadioSession] so the media-session queue and the browse tree cannot drift
-     * apart on which cover a song shows.
-     */
-    internal fun artworkUriFor(songId: String): Uri? {
-        val song = symphony.groove.song.get(songId) ?: return null
-        return songArtworkUri(song.id, song.coverFile)
-    }
-
-    private fun playlistIconUri(playlist: Playlist): Uri? {
-        playlist.customCoverPath?.let {
-            return ArtworkProvider.playlistCoverUri(context, it)
+    /** Parents whose children can display this song's artwork. */
+    internal fun artworkParentsForSong(songId: String): Set<String> {
+        val parents = mutableSetOf(
+            MediaId.CATEGORY_SONGS,
+            MediaId.CATEGORY_ALBUMS,
+            MediaId.CATEGORY_ARTISTS,
+            MediaId.CATEGORY_PLAYLISTS,
+            MediaId.CATEGORY_FOLDERS,
+        )
+        val song = symphony.groove.song.get(songId) ?: return parents
+        symphony.groove.album.getIdFromSong(song)?.let {
+            parents.add(MediaId.of(MediaId.TYPE_ALBUM, it))
         }
-        val firstCover = playlist.getSongIds(symphony).firstOrNull()
-            ?.let { symphony.groove.song.get(it)?.coverFile }
-        return coversUri(firstCover)
+        song.artists.forEach { parents.add(MediaId.of(MediaId.TYPE_ARTIST, it)) }
+        song.genres.forEach { parents.add(MediaId.of(MediaId.TYPE_GENRE, it)) }
+        symphony.groove.playlist.values().forEach { playlist ->
+            if (songId in playlist.getSongIds(symphony)) {
+                parents.add(MediaId.of(MediaId.TYPE_PLAYLIST, playlist.id))
+            }
+        }
+        SimplePath(song.path).parent?.let {
+            val folderPath = SimplePath("root", it.pathString).pathString
+            parents.add(MediaId.of(MediaId.TYPE_FOLDER, folderPath))
+        }
+        return parents
     }
 
     companion object {

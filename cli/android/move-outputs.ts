@@ -18,10 +18,7 @@ const main = async () => {
                 Paths.appDir,
                 `build/outputs/apk/${APP_BUILD_TYPE}/app-${abi}-${APP_BUILD_TYPE}.apk`,
             ),
-            path.join(
-                Paths.distDir,
-                `symphony-v${APP_VERSION_NAME}-${abi}.apk`,
-            ),
+            path.join(Paths.distDir, `mazika-v${APP_VERSION_NAME}-${abi}.apk`),
         );
     }
     await move(
@@ -29,7 +26,7 @@ const main = async () => {
             Paths.appDir,
             `build/outputs/bundle/${APP_BUILD_TYPE}/app-${APP_BUILD_TYPE}.aab`,
         ),
-        path.join(Paths.distDir, `symphony-v${APP_VERSION_NAME}.aab`),
+        path.join(Paths.distDir, `mazika-v${APP_VERSION_NAME}.aab`),
     );
     await moveZipped(
         path.join(

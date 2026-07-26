@@ -1,11 +1,24 @@
 package io.github.zyrouge.symphony.ui.view
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraphBuilder
@@ -15,6 +28,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import io.github.zyrouge.symphony.MainActivity
 import io.github.zyrouge.symphony.Symphony
+import io.github.zyrouge.symphony.ui.components.AdaptiveSnackbar
 import io.github.zyrouge.symphony.ui.helpers.ScaleTransition
 import io.github.zyrouge.symphony.ui.helpers.SlideTransition
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
@@ -35,12 +49,14 @@ import io.github.zyrouge.symphony.ui.view.settings.PlayerSettingsView
 import io.github.zyrouge.symphony.ui.view.settings.PlayerSettingsViewRoute
 import io.github.zyrouge.symphony.ui.view.settings.UpdateSettingsView
 import io.github.zyrouge.symphony.ui.view.settings.UpdateSettingsViewRoute
+import io.github.zyrouge.symphony.utils.ActivityUtils
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.serializer
 
 @Composable
 fun BaseView(symphony: Symphony, activity: MainActivity) {
     val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
     val context = remember {
         ViewContext(
             symphony = symphony,
@@ -48,69 +64,95 @@ fun BaseView(symphony: Symphony, activity: MainActivity) {
             navController = navController,
         )
     }
+    val updateNotification = symphony.updateNotification
+
+    LaunchedEffect(updateNotification) {
+        val release = updateNotification ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = symphony.t.NewVersionAvailableX(release.tag),
+            actionLabel = symphony.t.Updates,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            ActivityUtils.startBrowserActivity(activity, Uri.parse(release.htmlUrl))
+        }
+        symphony.consumeUpdateNotification(release)
+    }
 
     SymphonyTheme(context) {
         Surface(color = MaterialTheme.colorScheme.background) {
-            NavHost(
-                navController = navController,
-                startDestination = HomeViewRoute,
-            ) {
-                baseComposable<HomeViewRoute> {
-                    HomeView(context)
+            Box(modifier = Modifier.fillMaxSize()) {
+                NavHost(
+                    navController = navController,
+                    startDestination = HomeViewRoute,
+                ) {
+                    baseComposable<HomeViewRoute> {
+                        HomeView(context)
+                    }
+                    baseComposable<NowPlayingViewRoute> {
+                        NowPlayingView(context)
+                    }
+                    baseComposable<QueueViewRoute> {
+                        QueueView(context)
+                    }
+                    baseComposable<ArtistViewRoute> {
+                        ArtistView(context, it.toRoute())
+                    }
+                    baseComposable<AlbumViewRoute> {
+                        AlbumView(context, it.toRoute())
+                    }
+                    baseComposable<SearchViewRoute> {
+                        SearchView(context, it.toRoute())
+                    }
+                    baseComposable<AlbumArtistViewRoute> {
+                        AlbumArtistView(context, it.toRoute())
+                    }
+                    baseComposable<GenreViewRoute> {
+                        GenreView(context, it.toRoute())
+                    }
+                    baseComposable<PlaylistViewRoute> {
+                        PlaylistView(context, it.toRoute())
+                    }
+                    baseComposable<LyricsViewRoute> {
+                        LyricsView(context)
+                    }
+                    baseComposable<SettingsViewRoute> {
+                        SettingsView(context, it.toRoute())
+                    }
+                    baseComposable<AppearanceSettingsViewRoute> {
+                        AppearanceSettingsView(context)
+                    }
+                    baseComposable<AndroidAutoSettingsViewRoute> {
+                        AndroidAutoSettingsView(context)
+                    }
+                    baseComposable<GrooveSettingsViewRoute> {
+                        GrooveSettingsView(context, it.toRoute())
+                    }
+                    baseComposable<HomePageSettingsViewRoute> {
+                        HomePageSettingsView(context)
+                    }
+                    baseComposable<MiniPlayerSettingsViewRoute> {
+                        MiniPlayerSettingsView(context)
+                    }
+                    baseComposable<NowPlayingSettingsViewRoute> {
+                        NowPlayingSettingsView(context)
+                    }
+                    baseComposable<PlayerSettingsViewRoute> {
+                        PlayerSettingsView(context)
+                    }
+                    baseComposable<UpdateSettingsViewRoute> {
+                        UpdateSettingsView(context)
+                    }
                 }
-                baseComposable<NowPlayingViewRoute> {
-                    NowPlayingView(context)
-                }
-                baseComposable<QueueViewRoute> {
-                    QueueView(context)
-                }
-                baseComposable<ArtistViewRoute> {
-                    ArtistView(context, it.toRoute())
-                }
-                baseComposable<AlbumViewRoute> {
-                    AlbumView(context, it.toRoute())
-                }
-                baseComposable<SearchViewRoute> {
-                    SearchView(context, it.toRoute())
-                }
-                baseComposable<AlbumArtistViewRoute> {
-                    AlbumArtistView(context, it.toRoute())
-                }
-                baseComposable<GenreViewRoute> {
-                    GenreView(context, it.toRoute())
-                }
-                baseComposable<PlaylistViewRoute> {
-                    PlaylistView(context, it.toRoute())
-                }
-                baseComposable<LyricsViewRoute> {
-                    LyricsView(context)
-                }
-                baseComposable<SettingsViewRoute> {
-                    SettingsView(context, it.toRoute())
-                }
-                baseComposable<AppearanceSettingsViewRoute> {
-                    AppearanceSettingsView(context)
-                }
-                baseComposable<AndroidAutoSettingsViewRoute> {
-                    AndroidAutoSettingsView(context)
-                }
-                baseComposable<GrooveSettingsViewRoute> {
-                    GrooveSettingsView(context, it.toRoute())
-                }
-                baseComposable<HomePageSettingsViewRoute> {
-                    HomePageSettingsView(context)
-                }
-                baseComposable<MiniPlayerSettingsViewRoute> {
-                    MiniPlayerSettingsView(context)
-                }
-                baseComposable<NowPlayingSettingsViewRoute> {
-                    NowPlayingSettingsView(context)
-                }
-                baseComposable<PlayerSettingsViewRoute> {
-                    PlayerSettingsView(context)
-                }
-                baseComposable<UpdateSettingsViewRoute> {
-                    UpdateSettingsView(context)
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 96.dp)
+                        .navigationBarsPadding(),
+                ) {
+                    AdaptiveSnackbar(it)
                 }
             }
         }

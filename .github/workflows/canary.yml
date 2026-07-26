@@ -61,43 +61,43 @@ jobs:
             - name: 🚀 Upload apk
               uses: actions/upload-artifact@v4
               with:
-                  name: symphony-v${{ steps.app_version.outputs.version }}-universal-apk
-                  path: ${{ env.OUTPUT_DIR }}/symphony-v${{ steps.app_version.outputs.version }}-universal.apk
+                  name: mazika-v${{ steps.app_version.outputs.version }}-universal-apk
+                  path: ${{ env.OUTPUT_DIR }}/mazika-v${{ steps.app_version.outputs.version }}-universal.apk
                   if-no-files-found: error
 
             - name: 🚀 Upload apk
               uses: actions/upload-artifact@v4
               with:
-                  name: symphony-v${{ steps.app_version.outputs.version }}-arm64-v8a-apk
-                  path: ${{ env.OUTPUT_DIR }}/symphony-v${{ steps.app_version.outputs.version }}-arm64-v8a.apk
+                  name: mazika-v${{ steps.app_version.outputs.version }}-arm64-v8a-apk
+                  path: ${{ env.OUTPUT_DIR }}/mazika-v${{ steps.app_version.outputs.version }}-arm64-v8a.apk
                   if-no-files-found: error
 
             - name: 🚀 Upload apk
               uses: actions/upload-artifact@v4
               with:
-                  name: symphony-v${{ steps.app_version.outputs.version }}-armeabi-v7a-apk
-                  path: ${{ env.OUTPUT_DIR }}/symphony-v${{ steps.app_version.outputs.version }}-armeabi-v7a.apk
+                  name: mazika-v${{ steps.app_version.outputs.version }}-armeabi-v7a-apk
+                  path: ${{ env.OUTPUT_DIR }}/mazika-v${{ steps.app_version.outputs.version }}-armeabi-v7a.apk
                   if-no-files-found: error
 
             - name: 🚀 Upload apk
               uses: actions/upload-artifact@v4
               with:
-                  name: symphony-v${{ steps.app_version.outputs.version }}-x86_64-apk
-                  path: ${{ env.OUTPUT_DIR }}/symphony-v${{ steps.app_version.outputs.version }}-x86_64.apk
+                  name: mazika-v${{ steps.app_version.outputs.version }}-x86_64-apk
+                  path: ${{ env.OUTPUT_DIR }}/mazika-v${{ steps.app_version.outputs.version }}-x86_64.apk
                   if-no-files-found: error
 
             - name: 🚀 Upload apk
               uses: actions/upload-artifact@v4
               with:
-                  name: symphony-v${{ steps.app_version.outputs.version }}-x86-apk
-                  path: ${{ env.OUTPUT_DIR }}/symphony-v${{ steps.app_version.outputs.version }}-x86.apk
+                  name: mazika-v${{ steps.app_version.outputs.version }}-x86-apk
+                  path: ${{ env.OUTPUT_DIR }}/mazika-v${{ steps.app_version.outputs.version }}-x86.apk
                   if-no-files-found: error
 
             - name: 🚀 Upload aab
               uses: actions/upload-artifact@v4
               with:
-                  name: symphony-v${{ steps.app_version.outputs.version }}-aab
-                  path: ${{ env.OUTPUT_DIR }}/symphony-v${{ steps.app_version.outputs.version }}.aab
+                  name: mazika-v${{ steps.app_version.outputs.version }}-aab
+                  path: ${{ env.OUTPUT_DIR }}/mazika-v${{ steps.app_version.outputs.version }}.aab
                   if-no-files-found: error
 
             - name: 🚀 Upload mapping

@@ -1,89 +1,129 @@
 package io.github.zyrouge.symphony.services.radio
 
 import java.util.Timer
-import kotlin.math.max
-import kotlin.math.min
+import kotlin.math.ceil
 
 object RadioEffects {
     class Fader(
         val options: Options,
         val onUpdate: (Float) -> Unit,
-        val onFinish: (Boolean) -> Unit,
+        val onFinish: (Result) -> Unit,
     ) {
+        enum class Result {
+            Completed,
+            Cancelled,
+        }
+
         data class Options(
             val from: Float,
             val to: Float,
             val duration: Int,
             val interval: Int = DEFAULT_INTERVAL,
         ) {
+            init {
+                require(interval > 0)
+            }
+
             companion object {
                 private const val DEFAULT_INTERVAL = 50
             }
         }
 
+        internal data class Step(val value: Float, val completed: Boolean)
+
+        internal class Progress(private val options: Options) {
+            private val stepCount = when {
+                options.duration <= 0 || options.from == options.to -> 0
+                else -> ceil(options.duration.toDouble() / options.interval).toInt().coerceAtLeast(1)
+            }
+            private var step = 0
+
+            val immediate get() = stepCount == 0
+
+            fun next(): Step {
+                if (immediate) {
+                    return Step(options.to, completed = true)
+                }
+                step = (step + 1).coerceAtMost(stepCount)
+                val completed = step == stepCount
+                val value = when {
+                    completed -> options.to
+                    else -> options.from + (options.to - options.from) * step / stepCount
+                }
+                return Step(value, completed)
+            }
+        }
+
+        private val lock = Any()
+        private val progress = Progress(options)
         private var timer: Timer? = null
-        private var ended = false
+        private var started = false
+        private var result: Result? = null
 
         fun start() {
-            val increments =
-                (options.to - options.from) * (options.interval.toFloat() / options.duration)
-            var volume = options.from
-            val isReverse = options.to < options.from
-            timer = kotlin.concurrent.timer(period = options.interval.toLong()) {
-                if (volume != options.to) {
-                    onUpdate(volume)
-                    volume = when {
-                        isReverse -> max(options.to, volume + increments)
-                        else -> min(options.to, volume + increments)
-                    }
-                } else {
-                    ended = true
-                    onFinish(true)
-                    destroy()
+            var completed = false
+            synchronized(lock) {
+                if (started || result != null) {
+                    return
                 }
+                started = true
+                if (progress.immediate) {
+                    result = Result.Completed
+                    onUpdate(options.to)
+                    completed = true
+                } else {
+                    timer = kotlin.concurrent.timer(
+                        name = "RadioFader",
+                        daemon = true,
+                        initialDelay = options.interval.toLong(),
+                        period = options.interval.toLong(),
+                    ) {
+                        tick()
+                    }
+                }
+            }
+            if (completed) {
+                onFinish(Result.Completed)
             }
         }
 
         fun stop() {
-            if (!ended) onFinish(false)
-            destroy()
+            val cancelled = synchronized(lock) {
+                if (result != null) {
+                    false
+                } else {
+                    result = Result.Cancelled
+                    destroyTimer()
+                    true
+                }
+            }
+            if (cancelled) {
+                onFinish(Result.Cancelled)
+            }
         }
 
-        private fun destroy() {
+        private fun tick() {
+            var completed = false
+            synchronized(lock) {
+                if (result != null) {
+                    return
+                }
+                val update = progress.next()
+                onUpdate(update.value)
+                if (update.completed && result == null) {
+                    result = Result.Completed
+                    destroyTimer()
+                    completed = true
+                }
+            }
+            if (completed) {
+                onFinish(Result.Completed)
+            }
+        }
+
+        private fun destroyTimer() {
             timer?.cancel()
             timer = null
         }
     }
-
-//    fun fadeIn(player: RadioPlayer, onEnd: () -> Unit) {
-//        val options = Fader.Options(
-//            when {
-//                player.isPlaying -> player.volume
-//                else -> RadioPlayer.MIN_VOLUME
-//            },
-//            RadioPlayer.MAX_VOLUME,
-//        )
-//        val fader = Fader(
-//            options,
-//            onUpdate = { player.setVolume(it) },
-//            onFinish = { onEnd() }
-//        )
-//        player.setVolume(options.from)
-//        player.start()
-//        fader.start()
-//    }
-//
-//    fun fadeOut(player: RadioPlayer, onEnd: () -> Unit) {
-//        val options = Fader.Options(player.volume, RadioPlayer.MIN_VOLUME)
-//        val fader = Fader(
-//            options,
-//            onUpdate = { player.setVolume(it) },
-//            onFinish = {
-//                player.pause()
-//                onEnd()
-//            }
-//        )
-//        player.setVolume(options.from)
-//        fader.start()
-//    }
 }

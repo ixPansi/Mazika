@@ -10,23 +10,36 @@ import io.github.zyrouge.symphony.ui.helpers.Assets
 
 class RadioArtworkCacher(val symphony: Symphony) {
     private var default: Bitmap? = null
-    private var cached = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+    private val cached = mutableMapOf<String, Bitmap>()
+    private val generations = mutableMapOf<String, Long>()
+    private val cacheLock = Any()
     private val cacheLimit = 3
 
     /** MAZIKA: drops a song's cached bitmap so the next read re-decodes it. Needed when
      * the user replaces a song's cover — the id has not changed, only the image. */
     fun invalidate(songId: String) {
-        cached.remove(songId)
+        synchronized(cacheLock) {
+            generations[songId] = (generations[songId] ?: 0L) + 1L
+            cached.remove(songId)
+        }
     }
 
     suspend fun getArtwork(song: Song): Bitmap {
-        return cached[song.id] ?: kotlin.run {
-            val result = symphony.applicationContext.imageLoader
-                .execute(song.createArtworkImageRequest(symphony).build())
-            val bitmap = result.drawable?.toBitmap() ?: getDefaultArtwork()
-            updateCache(song.id, bitmap)
-            bitmap
+        val generation = synchronized(cacheLock) {
+            cached[song.id]?.let { return it }
+            generations[song.id] ?: 0L
         }
+        val result = symphony.applicationContext.imageLoader
+            .execute(song.createArtworkImageRequest(symphony).build())
+        val bitmap = result.drawable?.toBitmap() ?: getDefaultArtwork()
+        synchronized(cacheLock) {
+            // A cover replacement may have invalidated this decode while Coil was
+            // working. Never let that old result become the next cached artwork.
+            if ((generations[song.id] ?: 0L) == generation) {
+                updateCache(song.id, bitmap)
+            }
+        }
+        return bitmap
     }
 
     private fun getDefaultArtwork(): Bitmap {

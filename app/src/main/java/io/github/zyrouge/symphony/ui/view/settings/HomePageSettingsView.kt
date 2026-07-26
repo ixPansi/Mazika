@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.ui.components.settings.ConsiderContributingTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsMultiOptionTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsOptionTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSideHeading
@@ -80,7 +79,6 @@ fun HomePageSettingsView(context: ViewContext) {
                     .fillMaxSize()
             ) {
                 Column(modifier = Modifier.verticalScroll(scrollState)) {
-                    ConsiderContributingTile(context)
                     SettingsSideHeading(context.symphony.t.Home)
                     SettingsMultiOptionTile(
                         context,

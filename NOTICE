@@ -1,0 +1,34 @@
+MAZIKA
+Copyright (C) 2026 ixPansi
+
+This program is a modified version of Symphony
+Copyright (C) Zyrouge and the Symphony contributors
+https://github.com/zyrouge/symphony
+
+Forked at upstream commit dd04b872b8b4e6dd56172c053a5776c4d56ad080.
+
+MAZIKA is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. It is distributed WITHOUT ANY WARRANTY; without even the
+implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+the LICENSE file for the full terms.
+
+MAZIKA is not affiliated with, endorsed by, or supported by the Symphony
+authors. It is distributed under its own application id
+(com.mazika.musicplayer) and installs alongside Symphony rather than
+replacing it.
+
+Modifications made by ixPansi in 2026:
+  - Android Auto support (browse tree, voice search, queue artwork, ordering)
+  - Custom playlist and song covers
+  - Recently played on the For You page
+  - Rewritten drag-to-reorder
+  - Theme presets with matching launcher icons
+  - Configurable pause/resume fade; swipe-down-for-lyrics
+  - Independent seek-forward and seek-back durations
+  - MAZIKA branding, application id and release pipeline
+
+Bundled third-party code:
+  - TagLib (metaphony/src/main/cpp/taglib), LGPL-2.1-or-later / MPL-1.1
+    https://github.com/taglib/taglib

@@ -10,7 +10,7 @@ class RadioShorty(private val symphony: Symphony) {
             return
         }
         when {
-            symphony.radio.isPlaying -> symphony.radio.pause()
+            symphony.radio.playWhenReady -> symphony.radio.pause()
             else -> symphony.radio.resume()
         }
     }
@@ -28,7 +28,8 @@ class RadioShorty(private val symphony: Symphony) {
     fun previous(): Boolean {
         return when {
             !symphony.radio.hasPlayer -> false
-            symphony.radio.currentPlaybackPosition!!.played <= 3000 && symphony.radio.canJumpToPrevious() -> {
+            (symphony.radio.currentPlaybackPosition?.played ?: 0L) <= 3000 &&
+                    symphony.radio.canJumpToPrevious() -> {
                 symphony.radio.jumpToPrevious()
                 true
             }
@@ -67,10 +68,10 @@ class RadioShorty(private val symphony: Symphony) {
         shuffle: Boolean = false,
         source: PlaySource? = null,
     ) {
-        symphony.radio.stop(ended = false)
         if (songIds.isEmpty()) {
             return
         }
+        symphony.radio.stop(ended = false)
         symphony.groove.playHistory.onPlayQueue(source)
         symphony.radio.queue.add(
             songIds,

@@ -14,10 +14,9 @@ import java.io.File
  * custom playlist covers to the Android Auto host process (which runs in another
  * app and cannot read the app's private files directly).
  *
- * The provider is not exported; [RadioBrowserService] grants read permission for
- * the specific icon URIs to the connecting browser client. Access is strictly
- * read-only and path-validated to prevent traversal outside the two cover
- * directories.
+ * The provider is not exported; [RadioBrowserService] grants prefix read access
+ * to connected browser clients. Access is strictly read-only and path-validated
+ * to prevent traversal outside the three cover directories.
  */
 class ArtworkProvider : ContentProvider() {
     override fun onCreate() = true
@@ -26,26 +25,13 @@ class ArtworkProvider : ContentProvider() {
         val ctx = context ?: return null
         val segments = uri.pathSegments
         if (segments.size != 2) return null
-        val baseDir = when (segments[0]) {
-            SEGMENT_COVERS -> File(ctx.dataDir, "covers")
-            SEGMENT_PLAYLIST_COVERS -> File(ctx.filesDir, "playlist_covers")
-            SEGMENT_SONG_COVERS -> File(ctx.filesDir, "song_covers")
-            else -> return null
-        }
         val name = try {
             MediaId.decode(segments[1])
         } catch (_: Exception) {
             return null
         }
-        if (name.isEmpty() || name.contains('/') || name.contains('\\') || name.contains("..")) {
-            return null
-        }
         return try {
-            val file = File(baseDir, name).canonicalFile
-            val allowedPrefix = baseDir.canonicalFile.path + File.separator
-            if (!file.path.startsWith(allowedPrefix) || !file.exists()) {
-                return null
-            }
+            val file = resolveArtworkFile(ctx, segments[0], name) ?: return null
             ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
         } catch (err: Exception) {
             Logger.warn("ArtworkProvider", "openFile failed for $uri: $err")
@@ -80,20 +66,17 @@ class ArtworkProvider : ContentProvider() {
 
         fun authority(context: Context) = "${context.packageName}.artwork"
 
-        /** Uri for a file inside the app's artwork cache (dataDir/covers). */
-        fun coversUri(context: Context, name: String): Uri = Uri.parse(
-            "content://${authority(context)}/$SEGMENT_COVERS/${MediaId.encode(name)}"
-        )
+        /** Validated Uri for a file inside the app's artwork cache (dataDir/covers). */
+        fun coversUri(context: Context, name: String): Uri? =
+            artworkUri(context, SEGMENT_COVERS, name)
 
-        /** Uri for a custom song cover (filesDir/song_covers). */
-        fun songCoverUri(context: Context, name: String): Uri = Uri.parse(
-            "content://${authority(context)}/$SEGMENT_SONG_COVERS/${MediaId.encode(name)}"
-        )
+        /** Validated Uri for a custom song cover (filesDir/song_covers). */
+        fun songCoverUri(context: Context, name: String): Uri? =
+            artworkUri(context, SEGMENT_SONG_COVERS, name)
 
-        /** Uri for a custom playlist cover (filesDir/playlist_covers). */
-        fun playlistCoverUri(context: Context, name: String): Uri = Uri.parse(
-            "content://${authority(context)}/$SEGMENT_PLAYLIST_COVERS/${MediaId.encode(name)}"
-        )
+        /** Validated Uri for a custom playlist cover (filesDir/playlist_covers). */
+        fun playlistCoverUri(context: Context, name: String): Uri? =
+            artworkUri(context, SEGMENT_PLAYLIST_COVERS, name)
 
         /**
          * The directory roots artwork can live under, for granting a browser client
@@ -104,5 +87,28 @@ class ArtworkProvider : ContentProvider() {
             SEGMENT_SONG_COVERS,
             SEGMENT_PLAYLIST_COVERS,
         ).map { Uri.parse("content://${authority(context)}/$it") }
+
+        private fun artworkUri(context: Context, segment: String, name: String): Uri? {
+            if (resolveArtworkFile(context, segment, name) == null) return null
+            return Uri.parse(
+                "content://${authority(context)}/$segment/${MediaId.encode(name)}"
+            )
+        }
+
+        private fun resolveArtworkFile(context: Context, segment: String, name: String): File? {
+            if (!isSafeArtworkFileName(name)) return null
+            val baseDir = when (segment) {
+                SEGMENT_COVERS -> File(context.dataDir, "covers")
+                SEGMENT_PLAYLIST_COVERS -> File(context.filesDir, "playlist_covers")
+                SEGMENT_SONG_COVERS -> File(context.filesDir, "song_covers")
+                else -> return null
+            }
+            return runCatching {
+                val canonicalBase = baseDir.canonicalFile
+                val file = File(canonicalBase, name).canonicalFile
+                val allowedPrefix = canonicalBase.path + File.separator
+                file.takeIf { it.path.startsWith(allowedPrefix) && it.isFile }
+            }.getOrNull()
+        }
     }
 }

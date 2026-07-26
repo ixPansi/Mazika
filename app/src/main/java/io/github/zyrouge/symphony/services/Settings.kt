@@ -104,21 +104,20 @@ class Settings(private val symphony: Symphony) {
         }
     }
 
-    /**
-     * MAZIKA: like [EnumSetEntry] but order-preserving, for settings where the
-     * sequence is the point (e.g. the Android Auto category order).
-     */
+    /** Stores enum selections as an ordered comma-separated list. */
     inner class EnumListEntry<T : Enum<T>>(
         key: String,
         values: EnumEntries<T>,
         val defaultValue: List<T>,
+        private val allowEmpty: Boolean = false,
     ) : Entry<List<T>>(key) {
         private val entries = values.associateBy { it.name }
 
         override fun getValueInternal() = getSharedPreferences().getString(key, null)
-            ?.split(",")
-            ?.mapNotNull { entries[it] }
-            ?.takeIf { it.isNotEmpty() }
+            ?.let { stored ->
+                if (stored.isEmpty()) emptyList() else stored.split(",").mapNotNull { entries[it] }
+            }
+            ?.takeIf { allowEmpty || it.isNotEmpty() }
             ?: defaultValue
 
         override fun setValueInternal(value: List<T>) = getSharedPreferences().edit {
@@ -126,28 +125,10 @@ class Settings(private val symphony: Symphony) {
         }
     }
 
-    inner class EnumSetEntry<T : Enum<T>>(
-        key: String,
-        values: EnumEntries<T>,
-        val defaultValue: Set<T>,
-    ) : Entry<Set<T>>(key) {
-        private val entries = values.associateBy { it.name }
-
-        override fun getValueInternal() = getSharedPreferences().getString(key, null)
-            ?.split(",")
-            ?.mapNotNull { entries[it] }
-            ?.toSet()
-            ?: defaultValue
-
-        override fun setValueInternal(value: Set<T>) = getSharedPreferences().edit {
-            putString(key, value.joinToString(",") { it.name })
-        }
-    }
-
-    // MAZIKA: default to the brand preset (dark red on dark) instead of following
-    // the system, and keep Material You off by default so the brand colour is what
-    // users actually see. Turning Material You on still overrides the preset colour
-    // with the wallpaper palette, as before.
+    // MAZIKA: default to Sunset (orange on dark) instead of following the system,
+    // and keep Material You off so the preset colour is what users actually see.
+    // Turning Material You on still overrides the preset colour with the wallpaper
+    // palette, as before.
     val themeMode = EnumEntry("theme_mode", enumEntries<ThemeMode>(), ThemePreset.Default.themeMode)
     val language = NullableStringEntry("language")
     val useMaterialYou = BooleanEntry("material_you", false)
@@ -280,50 +261,48 @@ class Settings(private val symphony: Symphony) {
                 putString(key, value?.serialize())
             }
     }
-    val lastHomeTab = EnumEntry("home_last_page", enumEntries<HomePage>(), HomePage.Songs)
+    val lastHomeTab = EnumEntry("home_last_page", enumEntries<HomePage>(), HomePage.ForYou)
     val songsFilterPattern = NullableStringEntry("songs_filter_pattern")
     val minSongDuration = IntEntry("min_song_duration", 0)
-    val checkForUpdates = BooleanEntry("check_for_updates", false)
-    val fadePlayback = BooleanEntry("fade_playback", false)
+    val checkForUpdates = BooleanEntry("check_for_updates", true)
+    val fadePlayback = BooleanEntry("fade_playback", true)
 
     // MAZIKA: dependent option controlling whether a user-initiated pause/resume
-    // fades. Defaults to true so existing users keep the previous fade behaviour
-    // when the main "fade playback" option is on. Only takes effect while
-    // [fadePlayback] is on; track-transition and forced (sleep-timer) fades are
-    // unaffected by this setting.
-    val fadeOnPauseResume = BooleanEntry("fade_on_pause_resume", true)
+    // fades. Only takes effect while [fadePlayback] is on; track-transition and
+    // forced (sleep-timer) fades are unaffected by this setting.
+    val fadeOnPauseResume = BooleanEntry("fade_on_pause_resume", false)
     val requireAudioFocus = BooleanEntry("require_audio_focus", true)
     val ignoreAudioFocusLoss = BooleanEntry("ignore_audio_focus_loss", false)
     val playOnHeadphonesConnect = BooleanEntry("play_on_headphones_connect", false)
     val pauseOnHeadphonesDisconnect = BooleanEntry("pause_on_headphones_disconnect", true)
     val primaryColor = NullableStringEntry("primary_color")
-    val fadePlaybackDuration = FloatEntry("fade_playback_duration", 1f)
-    val homeTabs = EnumSetEntry(
+    val fadePlaybackDuration = FloatEntry("fade_playback_duration", 6f)
+    val homeTabs = EnumListEntry(
         "home_tabs",
         enumEntries<HomePage>(),
-        setOf(
+        listOf(
             HomePage.ForYou,
-            HomePage.Songs,
-            HomePage.Albums,
-            HomePage.Artists,
             HomePage.Playlists,
+            HomePage.Songs,
+            HomePage.Artists,
+            HomePage.Genres,
         ),
     )
     val homePageBottomBarLabelVisibility = EnumEntry(
         "home_page_bottom_bar_label_visibility",
         enumEntries<HomePageBottomBarLabelVisibility>(),
-        HomePageBottomBarLabelVisibility.ALWAYS_VISIBLE,
+        HomePageBottomBarLabelVisibility.INVISIBLE,
     )
-    val forYouContents = EnumSetEntry(
+    val forYouContents = EnumListEntry(
         "for_you_contents",
         enumEntries<ForYou>(),
-        setOf(ForYou.Albums, ForYou.Artists),
+        listOf(ForYou.Albums, ForYou.Artists),
+        allowEmpty = true,
     )
     val blacklistFolders = StringSetEntry("blacklist_folders", emptySet())
     val whitelistFolders = StringSetEntry("whitelist_folders", emptySet())
-    val readIntroductoryMessage = BooleanEntry("introductory_message", false)
-    val nowPlayingAdditionalInfo = BooleanEntry("show_now_playing_additional_info", true)
-    val nowPlayingSeekControls = BooleanEntry("enable_seek_controls", false)
+    val nowPlayingAdditionalInfo = BooleanEntry("show_now_playing_additional_info", false)
+    val nowPlayingSeekControls = BooleanEntry("enable_seek_controls", true)
     val seekBackDuration = IntEntry("seek_back_duration", 15)
     // MAZIKA: this reused "seek_back_duration" upstream, so the forward and back
     // durations shared one stored value and changing either changed both.
@@ -334,7 +313,7 @@ class Settings(private val symphony: Symphony) {
     val nowPlayingControlsLayout = EnumEntry(
         "now_playing_controls_layout",
         enumEntries<NowPlayingControlsLayout>(),
-        NowPlayingControlsLayout.CompactLeft,
+        NowPlayingControlsLayout.Traditional,
     )
     val showUpdateToast = BooleanEntry("show_update_toast", true)
     val fontScale = FloatEntry("font_scale", 1f)
@@ -342,7 +321,7 @@ class Settings(private val symphony: Symphony) {
     val nowPlayingLyricsLayout = EnumEntry(
         "now_playing_lyrics_layout",
         enumEntries<NowPlayingLyricsLayout>(),
-        NowPlayingLyricsLayout.ReplaceArtwork,
+        NowPlayingLyricsLayout.SeparatePage,
     )
     val artistTagSeparators = StringSetEntry("artist_tag_separators", setOf(";", "/", ",", "+"))
     val genreTagSeparators = StringSetEntry("genre_tag_separators", setOf(";", "/", ",", "+"))
@@ -361,7 +340,7 @@ class Settings(private val symphony: Symphony) {
     val artworkQuality = EnumEntry(
         "artwork_quality",
         enumEntries<ImagePreserver.Quality>(),
-        ImagePreserver.Quality.Medium,
+        ImagePreserver.Quality.Loseless,
     )
     // MAZIKA: which categories appear on the Android Auto root screen, in order.
     val androidAutoCategories = EnumListEntry(

@@ -28,7 +28,8 @@ secrets/keystore.env                # its credentials
 ```
 
 Both are **git-ignored** (`.gitignore` ignores `secrets`) and are deliberately not
-committed. `artifacts/MAZIKA.apk` is signed with this key.
+committed. Release APKs under `app/build/outputs/apk/release/` (and the named
+copies `npm run android:move-outputs` writes to `dist/`) are signed with this key.
 
 Build a signed release with it:
 

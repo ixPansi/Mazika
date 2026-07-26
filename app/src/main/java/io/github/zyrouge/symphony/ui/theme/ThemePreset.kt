@@ -19,13 +19,19 @@ enum class ThemePreset(
     val primaryColor: PrimaryThemeColor,
     /**
      * Suffix of the `activity-alias` and icon resources for this preset, or null
-     * for [Custom], which leaves the launcher icon on the brand default.
+     * for [Custom], which leaves the launcher icon on the default preset.
      */
     val aliasSuffix: String?,
     /** Splash theme carrying this preset's coloured logo. */
     @StyleRes val splashTheme: Int,
 ) {
-    /** The MAZIKA brand look: dark red on a dark surface. Default. */
+    /** Warm orange. Default. */
+    Sunset(
+        ThemeMode.DARK, PrimaryThemeColor.Orange, "Orange",
+        R.style.Theme_Symphony_SplashScreen_Orange,
+    ),
+
+    /** The MAZIKA dark red look. */
     MazikaRed(
         ThemeMode.DARK, PrimaryThemeColor.MazikaRed, "Red",
         R.style.Theme_Symphony_SplashScreen_Red,
@@ -49,28 +55,22 @@ enum class ThemePreset(
         R.style.Theme_Symphony_SplashScreen_Cyan,
     ),
 
-    /** Warm orange. */
-    Sunset(
-        ThemeMode.DARK, PrimaryThemeColor.Orange, "Orange",
-        R.style.Theme_Symphony_SplashScreen_Orange,
-    ),
-
     /** The original Symphony purple, on a light surface. */
     Daylight(
         ThemeMode.LIGHT, PrimaryThemeColor.Purple, "Purple",
         R.style.Theme_Symphony_SplashScreen_Purple,
     ),
 
-    /** Anything the user configured by hand; keeps the brand splash. */
+    /** Anything the user configured by hand; keeps the default splash and icon. */
     Custom(
-        ThemeMode.SYSTEM, PrimaryThemeColor.MazikaRed, null,
-        R.style.Theme_Symphony_SplashScreen_Red,
+        ThemeMode.SYSTEM, PrimaryThemeColor.Orange, null,
+        R.style.Theme_Symphony_SplashScreen_Orange,
     );
 
     val color: Color get() = ThemeColors.resolvePrimaryColor(primaryColor)
 
     companion object {
-        val Default = MazikaRed
+        val Default = Sunset
 
         /** Presets offered in the picker, excluding the implicit [Custom] entry. */
         val selectable = entries.filter { it != Custom }
