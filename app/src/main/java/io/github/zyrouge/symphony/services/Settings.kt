@@ -62,6 +62,14 @@ class Settings(private val symphony: Symphony) {
         }
     }
 
+    inner class LongEntry(key: String, val defaultValue: Long) : Entry<Long>(key) {
+        override fun getValueInternal() = getSharedPreferences().getLong(key, defaultValue)
+
+        override fun setValueInternal(value: Long) = getSharedPreferences().edit {
+            putLong(key, value)
+        }
+    }
+
     inner class FloatEntry(key: String, val defaultValue: Float) : Entry<Float>(key) {
         override fun getValueInternal() = getSharedPreferences().getFloat(key, defaultValue)
 
@@ -316,6 +324,10 @@ class Settings(private val symphony: Symphony) {
         NowPlayingControlsLayout.Traditional,
     )
     val showUpdateToast = BooleanEntry("show_update_toast", true)
+
+    // MAZIKA: when the last update check finished, so a check that ran and found
+    // nothing is distinguishable from one that never ran. 0 means never.
+    val lastUpdateCheck = LongEntry("last_update_check", 0L)
     val fontScale = FloatEntry("font_scale", 1f)
     val contentScale = FloatEntry("content_scale", 1f)
     val nowPlayingLyricsLayout = EnumEntry(

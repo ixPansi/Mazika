@@ -98,23 +98,37 @@ class Symphony(application: Application) : AndroidViewModel(application), Sympho
         hooks.forEach { fn.invoke(it) }
     }
 
+    /**
+     * The automatic check, run once per process launch from `onSymphonyReady`.
+     * Honours the user's preference; see [checkForUpdatesNow] for the manual one.
+     */
     fun checkForUpdates() {
-        if (
-            !settings.checkForUpdates.value ||
-            !AppMeta.canCheckForUpdates ||
-            updateCheckJob?.isActive == true
-        ) {
+        if (!settings.checkForUpdates.value) {
+            return
+        }
+        checkForUpdatesNow()
+    }
+
+    /**
+     * MAZIKA: a check the user explicitly asked for.
+     *
+     * Deliberately ignores [Settings.checkForUpdates] — that setting governs the
+     * automatic check at startup, and pressing the button is intent that overrides
+     * it. [AppMeta.canCheckForUpdates] still gates it: with no repository slug
+     * there is nothing to call. The in-flight guard is what keeps repeated taps
+     * from hammering the GitHub API, which allows 60 unauthenticated requests an
+     * hour per address.
+     */
+    fun checkForUpdatesNow() {
+        if (!AppMeta.canCheckForUpdates || updateCheckJob?.isActive == true) {
             return
         }
         updateCheckJob = viewModelScope.launch {
             val release = withContext(Dispatchers.IO) {
                 AppMeta.fetchLatestVersion()
             }
-            if (
-                release != null &&
-                settings.checkForUpdates.value &&
-                settings.showUpdateToast.value
-            ) {
+            settings.lastUpdateCheck.setValue(System.currentTimeMillis())
+            if (release != null && settings.showUpdateToast.value) {
                 updateNotification = release
             }
         }

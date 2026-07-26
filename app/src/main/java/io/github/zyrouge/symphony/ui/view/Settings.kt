@@ -157,6 +157,35 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
                             }
                         }
                     }
+                    // MAZIKA is a fork of Symphony and ships under the AGPL-3.0, which
+                    // requires the licence terms and the absence of warranty to be
+                    // discoverable from the app itself, not just the repository. The
+                    // About chip carries that notice.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                    ) {
+                        SettingsChip(
+                            icon = Icons.Filled.Info,
+                            label = context.symphony.t.About,
+                        ) {
+                            showAboutDialog = true
+                        }
+                        LinkChip(
+                            context,
+                            icon = Icons.Filled.Code,
+                            label = context.symphony.t.SourceCode,
+                            url = AppMeta.sourceCodeUrl,
+                        )
+                        LinkChip(
+                            context,
+                            icon = Icons.Filled.Gavel,
+                            label = context.symphony.t.License,
+                            url = AppMeta.licenseUrl,
+                        )
+                    }
                     HorizontalDivider()
                     SettingsSimpleTile(
                         icon = {
@@ -255,36 +284,6 @@ fun SettingsView(context: ViewContext, route: SettingsViewRoute) {
                             onClick = {
                                 context.navController.navigate(UpdateSettingsViewRoute)
                             },
-                        )
-                    }
-                    // MAZIKA is a fork of Symphony and ships under the AGPL-3.0, which
-                    // requires the licence terms and the absence of warranty to be
-                    // discoverable from the app itself, not just the repository. The
-                    // About chip carries that notice.
-                    HorizontalDivider()
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .padding(16.dp),
-                    ) {
-                        SettingsChip(
-                            icon = Icons.Filled.Info,
-                            label = context.symphony.t.About,
-                        ) {
-                            showAboutDialog = true
-                        }
-                        LinkChip(
-                            context,
-                            icon = Icons.Filled.Code,
-                            label = context.symphony.t.SourceCode,
-                            url = AppMeta.sourceCodeUrl,
-                        )
-                        LinkChip(
-                            context,
-                            icon = Icons.Filled.Gavel,
-                            label = context.symphony.t.License,
-                            url = AppMeta.licenseUrl,
                         )
                     }
                 }

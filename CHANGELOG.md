@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026.7.117 — 2026-07-26
+
+### Added
+- **A manual update check**, in Settings → Updates, with the result actually shown. The
+  automatic check runs once per process launch from `onSymphonyReady`, so a device that had
+  no network at that moment never retried for the life of the process — and the screen
+  rendered only `UpdateState.Available`, leaving `Idle`, `Checking`, `UpToDate` and `Failed`
+  all drawing nothing. A check that ran and failed was indistinguishable from one that
+  never ran.
+  - `checkForUpdatesNow()` deliberately ignores the `checkForUpdates` preference: that
+    setting governs the startup check, and pressing the button is intent that overrides it.
+    The in-flight guard is retained, which is what stops repeated taps from spending the
+    60-per-hour unauthenticated GitHub rate limit.
+  - The tile reports Checking, up to date, or failed-tap-to-retry inline, plus a snackbar on
+    completion — but only for a check started from that screen, so the startup one stays
+    silent.
+  - When idle it shows how long ago the last check finished, persisted in a new
+    `last_update_check` preference. Relative time comes from the platform's
+    `DateUtils.getRelativeTimeSpanString`, which is localised in all eighteen languages
+    without needing plural forms per locale in the translation files.
+
+### Changed
+- The **About, Source code and License** chips moved from the bottom of Settings to
+  directly under the app name and version, which is where Symphony puts them and where
+  they are actually looked for.
+- The automatic-check switch is now labelled **Check on startup**, describing what it does
+  and leaving "Check for updates" free for the button that performs one.
+
 ## 2026.7.116 — 2026-07-26
 
 First public release. Everything below, plus the fork baseline in the section after

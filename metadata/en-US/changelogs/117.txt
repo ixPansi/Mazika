@@ -1,0 +1,2 @@
+* Check for updates yourself, from Settings > Updates. The automatic check only runs when the app starts, so a phone that was offline at the time never tried again - and a check that failed looked exactly like one that never ran. It now shows what happened, and when it last looked.
+* The About, Source code and License links moved up next to the app name and version, where you would expect to find them.
