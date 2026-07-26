@@ -304,6 +304,31 @@ class PlaylistRepository(private val symphony: Symphony) {
         update(favorites.id, songIds.mutate { remove(songId) })
     }
 
+    /**
+     * MAZIKA: favourites a batch in one write.
+     *
+     * Calling the single-song version in a loop would rewrite the whole favourites
+     * playlist once per song, and emit an update for each - noticeable when a user
+     * selects a few hundred tracks.
+     */
+    fun favorite(newSongIds: Collection<String>) {
+        if (newSongIds.isEmpty()) return
+        val favorites = getFavorites()
+        val songIds = favorites.getSongIds(symphony)
+        val additions = newSongIds.filterNot(songIds::contains).distinct()
+        if (additions.isEmpty()) return
+        update(favorites.id, songIds.mutate { addAll(additions) })
+    }
+
+    fun unfavorite(removedSongIds: Collection<String>) {
+        if (removedSongIds.isEmpty()) return
+        val favorites = getFavorites()
+        val songIds = favorites.getSongIds(symphony)
+        val removals = removedSongIds.toSet()
+        if (songIds.none(removals::contains)) return
+        update(favorites.id, songIds.filterNot(removals::contains))
+    }
+
     fun isFavoritesPlaylist(playlist: Playlist) = playlist.id == FAVORITE_PLAYLIST
     fun isBuiltInPlaylist(playlist: Playlist) = isFavoritesPlaylist(playlist)
 

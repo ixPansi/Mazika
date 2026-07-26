@@ -838,3 +838,20 @@ parameters = ["x"]
 
 [[keys]]
 name = "CheckForUpdatesOnStartup"
+
+[[keys]]
+name = "Select"
+
+[[keys]]
+name = "SelectAll"
+
+[[keys]]
+name = "XSelected"
+parameters = ["x"]
+
+[[keys]]
+name = "ChangeCover"
+
+[[keys]]
+name = "XCoversUpdated"
+parameters = ["x"]

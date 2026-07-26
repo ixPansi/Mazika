@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,10 +58,23 @@ fun AddToPlaylistDialog(
                             image = playlist
                                 .createArtworkImageRequest(context.symphony)
                                 .build(),
+                            // MAZIKA: a tick when every selected song is already here, a
+                            // dash when only some are. This used to be gated on a
+                            // single song, so a multi-song selection showed nothing at
+                            // all and gave no clue what was already added.
                             imageLabel = when {
-                                songIds.size == 1 && playlistSongIds.contains(songIds[0]) -> ({
+                                songIds.isEmpty() -> null
+                                songIds.all(playlistSongIds::contains) -> ({
                                     Icon(
                                         Icons.Filled.Check,
+                                        null,
+                                        modifier = Modifier.size(12.dp),
+                                    )
+                                })
+
+                                songIds.any(playlistSongIds::contains) -> ({
+                                    Icon(
+                                        Icons.Filled.HorizontalRule,
                                         null,
                                         modifier = Modifier.size(12.dp),
                                     )
@@ -80,10 +94,16 @@ fun AddToPlaylistDialog(
                                 )
                             },
                             onClick = {
-                                context.symphony.groove.playlist.update(
-                                    playlist.id,
-                                    playlistSongIds.mutate { addAll(songIds) },
-                                )
+                                // Songs already in the playlist are skipped rather than
+                                // appended a second time; adding a whole album twice is
+                                // easy to do by accident once selections exist.
+                                val additions = songIds.filterNot(playlistSongIds::contains)
+                                if (additions.isNotEmpty()) {
+                                    context.symphony.groove.playlist.update(
+                                        playlist.id,
+                                        playlistSongIds.mutate { addAll(additions) },
+                                    )
+                                }
                                 onDismissRequest()
                             }
                         )

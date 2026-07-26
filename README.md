@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-orange.svg?style=flat-square)](./LICENSE)
 [![Android](https://img.shields.io/badge/Android-9%2B-orange.svg?style=flat-square)](#requirements)
-[![Release](https://img.shields.io/badge/release-v2026.7.118-orange.svg?style=flat-square)](https://github.com/ixPansi/Mazika/releases/latest)
+[![Release](https://img.shields.io/badge/release-v2026.7.119-orange.svg?style=flat-square)](https://github.com/ixPansi/Mazika/releases/latest)
 [![Built with](https://img.shields.io/badge/built%20with-Jetpack%20Compose-orange.svg?style=flat-square)](https://developer.android.com/jetpack/compose)
 
 </div>
@@ -27,6 +27,7 @@
 | **Custom playlist covers** | — | Pick, crop, replace, remove |
 | **Custom song covers** | — | Same, and they survive a library rescan |
 | **Recently played** | — | What you played *from* — albums, artists, playlists, folders |
+| **Select many songs** | — | Long-press to select, then bulk play, queue, playlist, favourite or cover |
 | **Drag to reorder** | Queue and playlists, unreliable | Rewritten; also home tabs, For You, car categories |
 | **Favourite a song** | Buried in the overflow menu | One tap on the row |
 | **Theme presets** | Mode and colour, set separately | Six one-tap presets |

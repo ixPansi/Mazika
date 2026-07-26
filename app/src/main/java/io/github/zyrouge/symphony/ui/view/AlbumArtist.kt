@@ -1,5 +1,6 @@
 package io.github.zyrouge.symphony.ui.view
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.zyrouge.symphony.services.groove.AlbumArtist
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.components.AlbumArtistDropdownMenu
 import io.github.zyrouge.symphony.ui.components.AlbumRow
 import io.github.zyrouge.symphony.ui.components.AnimatedNowPlayingBottomBar
@@ -33,9 +35,10 @@ import io.github.zyrouge.symphony.ui.components.GenericGrooveBanner
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
 import io.github.zyrouge.symphony.ui.components.IconTextBody
 import io.github.zyrouge.symphony.ui.components.SongList
+import io.github.zyrouge.symphony.ui.components.SongSelectionTopAppBar
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
+import io.github.zyrouge.symphony.ui.helpers.rememberSongSelectionState
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -60,34 +63,46 @@ fun AlbumArtistView(context: ViewContext, route: AlbumArtistViewRoute) {
         derivedStateOf { albumArtist != null }
     }
 
+    val selection = rememberSongSelectionState()
+    // Back leaves the selection before it leaves the screen.
+    BackHandler(enabled = selection.isActive) { selection.clear() }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            CenterAlignedTopAppBar(
-                navigationIcon = {
-                    IconButton(
-                        onClick = { context.navController.popBackStack() }
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
-                },
-                title = {
-                    TopAppBarMinimalTitle {
-                        Text(
-                            context.symphony.t.AlbumArtist +
-                                    (albumArtist?.let { " - ${it.name}" } ?: ""),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-                actions = {
-                    IconButtonPlaceholder()
-                },
-            )
+            when {
+                selection.isActive -> SongSelectionTopAppBar(
+                    context,
+                    selection = selection,
+                )
+
+                else ->
+                CenterAlignedTopAppBar(
+                    navigationIcon = {
+                        IconButton(
+                            onClick = { context.navController.popBackStack() }
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                        }
+                    },
+                    title = {
+                        TopAppBarMinimalTitle {
+                            Text(
+                                context.symphony.t.AlbumArtist +
+                                        (albumArtist?.let { " - ${it.name}" } ?: ""),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    ),
+                    actions = {
+                        IconButtonPlaceholder()
+                    },
+                )
+            }
         },
         content = { contentPadding ->
             Box(
@@ -99,6 +114,7 @@ fun AlbumArtistView(context: ViewContext, route: AlbumArtistViewRoute) {
                     SongList(
                         context,
                         songIds = songIds,
+                        selection = selection,
                         playSource = PlaySource.albumArtist(route.albumArtistName),
                         leadingContent = {
                             item {

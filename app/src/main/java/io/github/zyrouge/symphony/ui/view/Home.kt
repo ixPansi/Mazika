@@ -1,5 +1,6 @@
 package io.github.zyrouge.symphony.ui.view
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.togetherWith
@@ -75,11 +76,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.zyrouge.symphony.services.groove.Groove
 import io.github.zyrouge.symphony.ui.components.NowPlayingBottomBar
+import io.github.zyrouge.symphony.ui.components.SongSelectionTopAppBar
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
 import io.github.zyrouge.symphony.ui.components.swipeable
 import io.github.zyrouge.symphony.ui.helpers.ScaleTransition
 import io.github.zyrouge.symphony.ui.helpers.SlideTransition
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
+import io.github.zyrouge.symphony.ui.helpers.rememberSongSelectionState
 import io.github.zyrouge.symphony.ui.view.home.AlbumArtistsView
 import io.github.zyrouge.symphony.ui.view.home.AlbumsView
 import io.github.zyrouge.symphony.ui.view.home.ArtistsView
@@ -174,86 +177,100 @@ fun HomeView(context: ViewContext) {
     val currentTab by context.symphony.settings.lastHomeTab.flow.collectAsState()
     var showOptionsDropdown by remember { mutableStateOf(false) }
     var showTabsSheet by remember { mutableStateOf(false) }
+    // MAZIKA: the home tabs have no app bar of their own - this one belongs to
+    // HomeView - so the selection bar is hoisted here and shared by the tabs that
+    // show songs. SongList publishes its rows onto the state, so this does not need
+    // to know which tab produced them.
+    val songSelection = rememberSongSelectionState()
+    BackHandler(enabled = songSelection.isActive) { songSelection.clear() }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-                navigationIcon = {
-                    IconButton(
-                        content = {
-                            Icon(Icons.Filled.Search, null)
-                        },
-                        onClick = {
-                            context.navController.navigate(SearchViewRoute(currentTab.kind?.name))
-                        }
-                    )
-                },
-                title = {
-                    Crossfade(
-                        label = "home-title",
-                        targetState = currentTab.label(context),
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            TopAppBarMinimalTitle { Text(it) }
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(
-                        content = {
-                            Icon(Icons.Filled.MoreVert, null)
-                            DropdownMenu(
-                                expanded = showOptionsDropdown,
-                                onDismissRequest = { showOptionsDropdown = false },
-                            ) {
-                                DropdownMenuItem(
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Filled.Refresh,
-                                            context.symphony.t.Rescan,
-                                        )
-                                    },
-                                    text = {
-                                        Text(context.symphony.t.Rescan)
-                                    },
-                                    onClick = {
-                                        showOptionsDropdown = false
-                                        context.symphony.radio.stop()
-                                        context.symphony.groove.fetch(
-                                            Groove.FetchOptions(resetInMemoryCache = true),
-                                        )
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Filled.Settings,
-                                            context.symphony.t.Settings,
-                                        )
-                                    },
-                                    text = {
-                                        Text(context.symphony.t.Settings)
-                                    },
-                                    onClick = {
-                                        showOptionsDropdown = false
-                                        context.navController.navigate(SettingsViewRoute())
-                                    }
-                                )
+            when {
+                songSelection.isActive -> SongSelectionTopAppBar(
+                    context,
+                    selection = songSelection,
+                )
+
+                else ->
+                CenterAlignedTopAppBar(
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    ),
+                    navigationIcon = {
+                        IconButton(
+                            content = {
+                                Icon(Icons.Filled.Search, null)
+                            },
+                            onClick = {
+                                context.navController.navigate(SearchViewRoute(currentTab.kind?.name))
                             }
-                        },
-                        onClick = {
-                            showOptionsDropdown = !showOptionsDropdown
+                        )
+                    },
+                    title = {
+                        Crossfade(
+                            label = "home-title",
+                            targetState = currentTab.label(context),
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                TopAppBarMinimalTitle { Text(it) }
+                            }
                         }
-                    )
-                }
-            )
+                    },
+                    actions = {
+                        IconButton(
+                            content = {
+                                Icon(Icons.Filled.MoreVert, null)
+                                DropdownMenu(
+                                    expanded = showOptionsDropdown,
+                                    onDismissRequest = { showOptionsDropdown = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Filled.Refresh,
+                                                context.symphony.t.Rescan,
+                                            )
+                                        },
+                                        text = {
+                                            Text(context.symphony.t.Rescan)
+                                        },
+                                        onClick = {
+                                            showOptionsDropdown = false
+                                            context.symphony.radio.stop()
+                                            context.symphony.groove.fetch(
+                                                Groove.FetchOptions(resetInMemoryCache = true),
+                                            )
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Filled.Settings,
+                                                context.symphony.t.Settings,
+                                            )
+                                        },
+                                        text = {
+                                            Text(context.symphony.t.Settings)
+                                        },
+                                        onClick = {
+                                            showOptionsDropdown = false
+                                            context.navController.navigate(SettingsViewRoute())
+                                        }
+                                    )
+                                }
+                            },
+                            onClick = {
+                                showOptionsDropdown = !showOptionsDropdown
+                            }
+                        )
+                    }
+                )
+            }
         },
         content = { contentPadding ->
             AnimatedContent(
@@ -269,13 +286,13 @@ fun HomeView(context: ViewContext) {
             ) { page ->
                 when (page) {
                     HomePage.ForYou -> ForYouView(context)
-                    HomePage.Songs -> SongsView(context)
+                    HomePage.Songs -> SongsView(context, songSelection)
                     HomePage.Albums -> AlbumsView(context)
                     HomePage.Artists -> ArtistsView(context)
                     HomePage.AlbumArtists -> AlbumArtistsView(context)
                     HomePage.Genres -> GenresView(context)
                     HomePage.Browser -> BrowserView(context)
-                    HomePage.Folders -> FoldersView(context)
+                    HomePage.Folders -> FoldersView(context, songSelection)
                     HomePage.Playlists -> PlaylistsView(context)
                     HomePage.Tree -> TreeView(context)
                 }

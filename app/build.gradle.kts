@@ -29,8 +29,8 @@ android {
         minSdk = libs.versions.min.sdk.get().toInt()
         targetSdk = libs.versions.target.sdk.get().toInt()
 
-        versionCode = 118
-        versionName = "2026.7.118"
+        versionCode = 119
+        versionName = "2026.7.119"
         versionName = System.getenv("APP_VERSION_NAME") ?: versionName
         buildConfigField(
             "String",

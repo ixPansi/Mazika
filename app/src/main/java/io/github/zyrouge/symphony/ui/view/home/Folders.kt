@@ -45,6 +45,7 @@ import io.github.zyrouge.symphony.ui.helpers.Assets
 import io.github.zyrouge.symphony.ui.helpers.FadeTransition
 import io.github.zyrouge.symphony.ui.helpers.SlideTransition
 import io.github.zyrouge.symphony.services.groove.PlaySource
+import io.github.zyrouge.symphony.ui.helpers.SongSelectionState
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.nowPlaying.defaultHorizontalPadding
 import io.github.zyrouge.symphony.utils.SimpleFileSystem
@@ -52,7 +53,7 @@ import io.github.zyrouge.symphony.utils.StringListUtils
 import java.util.Stack
 
 @Composable
-fun FoldersView(context: ViewContext) {
+fun FoldersView(context: ViewContext, selection: SongSelectionState? = null) {
     val isUpdating by context.symphony.groove.song.isUpdating.collectAsState()
     val id by context.symphony.groove.song.id.collectAsState()
     val explorer = context.symphony.groove.song.explorer
@@ -131,7 +132,12 @@ fun FoldersView(context: ViewContext) {
                         Text(folder.name, style = MaterialTheme.typography.bodyLarge)
                     }
                     HorizontalDivider()
-                    SongList(context, songIds = songIds, songsCount = songIds.size)
+                    SongList(
+                        context,
+                        songIds = songIds,
+                        songsCount = songIds.size,
+                        selection = selection,
+                    )
                 }
             } else {
                 FoldersGrid(

@@ -1,5 +1,6 @@
 package io.github.zyrouge.symphony.ui.view
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -23,13 +24,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.components.AnimatedNowPlayingBottomBar
 import io.github.zyrouge.symphony.ui.components.GenericSongListDropdown
 import io.github.zyrouge.symphony.ui.components.IconTextBody
 import io.github.zyrouge.symphony.ui.components.SongList
+import io.github.zyrouge.symphony.ui.components.SongSelectionTopAppBar
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
+import io.github.zyrouge.symphony.ui.helpers.rememberSongSelectionState
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -50,46 +53,58 @@ fun GenreView(context: ViewContext, route: GenreViewRoute) {
         derivedStateOf { allGenreNames.contains(route.genreName) }
     }
 
+    val selection = rememberSongSelectionState()
+    // Back leaves the selection before it leaves the screen.
+    BackHandler(enabled = selection.isActive) { selection.clear() }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            CenterAlignedTopAppBar(
-                navigationIcon = {
-                    IconButton(
-                        onClick = { context.navController.popBackStack() }
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
-                },
-                title = {
-                    TopAppBarMinimalTitle {
-                        Text(context.symphony.t.Genre
-                                + (genre?.let { " - ${it.name}" } ?: ""))
-                    }
-                },
-                actions = {
-                    var showOptionsMenu by remember { mutableStateOf(false) }
+            when {
+                selection.isActive -> SongSelectionTopAppBar(
+                    context,
+                    selection = selection,
+                )
 
-                    IconButton(
-                        onClick = {
-                            showOptionsMenu = !showOptionsMenu
+                else ->
+                CenterAlignedTopAppBar(
+                    navigationIcon = {
+                        IconButton(
+                            onClick = { context.navController.popBackStack() }
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                         }
-                    ) {
-                        Icon(Icons.Filled.MoreVert, null)
-                        GenericSongListDropdown(
-                            context,
-                            songIds = songIds,
-                            expanded = showOptionsMenu,
-                            onDismissRequest = {
-                                showOptionsMenu = false
+                    },
+                    title = {
+                        TopAppBarMinimalTitle {
+                            Text(context.symphony.t.Genre
+                                    + (genre?.let { " - ${it.name}" } ?: ""))
+                        }
+                    },
+                    actions = {
+                        var showOptionsMenu by remember { mutableStateOf(false) }
+
+                        IconButton(
+                            onClick = {
+                                showOptionsMenu = !showOptionsMenu
                             }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-            )
+                        ) {
+                            Icon(Icons.Filled.MoreVert, null)
+                            GenericSongListDropdown(
+                                context,
+                                songIds = songIds,
+                                expanded = showOptionsMenu,
+                                onDismissRequest = {
+                                    showOptionsMenu = false
+                                }
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    ),
+                )
+            }
         },
         content = { contentPadding ->
             Box(
@@ -101,6 +116,7 @@ fun GenreView(context: ViewContext, route: GenreViewRoute) {
                     isViable -> SongList(
                         context,
                         songIds = songIds,
+                        selection = selection,
                         playSource = PlaySource.genre(route.genreName),
                     )
                     else -> UnknownGenre(context, route.genreName)

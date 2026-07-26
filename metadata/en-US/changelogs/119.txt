@@ -1,0 +1,5 @@
+Select several songs at once.
+
+* Long-press a song to start selecting, then tap to add more. Works in Songs, Albums, Artists, Album artists, Genres and Folders. On a playlist, where holding a row already reorders it, start selecting from the menu.
+* With songs selected: play, shuffle, play next, add to queue, add to a playlist, favourite, set one cover for all, or remove from the playlist.
+* Adding to a playlist no longer adds a song that is already in it.

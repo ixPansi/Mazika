@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HideImage
@@ -161,6 +162,11 @@ fun PlaylistDropdownMenu(
     onSongsChanged: (() -> Unit) = {},
     onRename: (() -> Unit) = {},
     onDelete: (() -> Unit) = {},
+    /**
+     * MAZIKA: shown only on the playlist screen, where drag-to-reorder already owns the
+     * long press that starts a selection everywhere else.
+     */
+    onSelect: (() -> Unit)? = null,
     onDismissRequest: () -> Unit,
 ) {
     val savePlaylistLauncher = rememberLauncherForActivityResult(
@@ -278,6 +284,17 @@ fun PlaylistDropdownMenu(
                     onDismissRequest()
                     showSongsPicker = true
                 }
+            )
+        }
+        onSelect?.let { startSelection ->
+            DropdownMenuItem(
+                leadingIcon = {
+                    Icon(Icons.Filled.Checklist, null)
+                },
+                text = {
+                    Text(context.symphony.t.Select)
+                },
+                onClick = { startSelection() },
             )
         }
         DropdownMenuItem(

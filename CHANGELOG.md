@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026.7.119 — 2026-07-26
+
+### Added
+- **Multi-select and bulk actions.** Long-press a song to start selecting, then tap rows
+  to add or remove; the app bar becomes a selection bar showing the count. Available on
+  Songs, Albums, Artists, Album artists, Genres and Folders. On a playlist the long press
+  already belongs to drag-to-reorder, so selection starts from **⋮ → Select** there
+  instead — the gesture is not taken away from reordering.
+  - Selected songs can be played, shuffled, played next, added to the queue, added to a
+    playlist, favourited or unfavourited, given one cover, had their custom covers
+    cleared, or removed from the playlist you are looking at.
+  - Selection is keyed on the row's list key rather than the song id, because a playlist
+    may legitimately hold the same song twice. Selecting one copy selects exactly that
+    copy, and removing acts on that position rather than on every occurrence.
+  - Back exits the selection before it leaves the screen, and selections drop rows that
+    disappear underneath them, so the count can never describe songs that are no longer
+    on screen.
+
+### Changed
+- **Adding to a playlist no longer duplicates songs that are already in it**, which is
+  easy to do by accident once whole albums can be selected at once. The dialog also shows
+  a tick when everything selected is already in a playlist and a dash when only some of it
+  is — previously it showed nothing at all unless exactly one song was being added.
+- Favouriting several songs now performs a single write rather than rewriting the
+  favourites playlist once per song.
+- Applying one image to several songs decodes, orients, crops and compresses it **once**
+  and copies the result, instead of repeating the whole bitmap pipeline per song. Each
+  song still gets its own file, so clearing one song's cover cannot remove another's.
+
 ## 2026.7.118 — 2026-07-26
 
 ### Fixed

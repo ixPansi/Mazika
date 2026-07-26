@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,6 +37,7 @@ import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.services.groove.Song
 import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
 import io.github.zyrouge.symphony.services.radio.Radio
+import io.github.zyrouge.symphony.ui.helpers.SongSelectionState
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
 import io.github.zyrouge.symphony.ui.view.SettingsViewRoute
 import io.github.zyrouge.symphony.ui.view.settings.GrooveSettingsViewRoute
@@ -75,6 +78,12 @@ fun SongList(
      * plain library list, where the song itself is the only thing to record.
      */
     playSource: PlaySource? = null,
+    /**
+     * MAZIKA: multi-select. When supplied, a long press on a row enters selection mode
+     * and taps toggle rows instead of playing them. Reordering is suppressed while a
+     * selection is active, since both want the long press and the same rows.
+     */
+    selection: SongSelectionState? = null,
 ) {
     val sortBy by type.getLastUsedSortBy(context).flow.collectAsState()
     val sortReverse by type.getLastUsedSortReverse(context).flow.collectAsState()
@@ -84,9 +93,11 @@ fun SongList(
         }
     }
     val lazyListState = rememberLazyListState()
+    val isSelecting = selection?.isActive == true
     val canReorder = onReorder != null &&
             leadingContent == null &&
-            sortBy == SongRepository.SortBy.CUSTOM
+            sortBy == SongRepository.SortBy.CUSTOM &&
+            !isSelecting
     val displayedEntries = remember(songIds, sortedSongIds, sortReverse) {
         songIds.toReorderableEntriesInOrder(
             orderedValues = sortedSongIds,
@@ -118,25 +129,60 @@ fun SongList(
         onDispose { currentOnReorderStateChange?.invoke(false) }
     }
 
+    // MAZIKA: publish what is on screen so a selection bar hoisted out of this list can
+    // resolve uids, and drop selections whose rows have gone - after a bulk remove or a
+    // rescan - so the count in the bar can never outrun what is actually there.
+    LaunchedEffect(displayedEntries, selection) {
+        selection?.entries = displayedEntries
+        if (selection?.isActive == true) selection.retain(displayedEntries)
+    }
+
     val rowContent: @Composable (Int, ReorderableEntry<String>) -> Unit = { i, entry ->
         context.symphony.groove.song.get(entry.value)?.let { song ->
+            val isSelected = isSelecting && selection?.contains(entry.uid) == true
             SongCard(
                 context,
                 song = song,
+                selected = isSelected,
+                leading = when {
+                    isSelecting -> ({
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { selection?.toggle(entry.uid) },
+                            modifier = Modifier.offset((-4).dp),
+                        )
+                    })
+
+                    else -> ({})
+                },
                 thumbnailLabel = cardThumbnailLabel?.let {
                     { it(i, song) }
                 },
                 thumbnailLabelStyle = cardThumbnailLabelStyle,
-                disableHeartIcon = disableHeartIcon,
-                trailingOptionsContent = trailingOptionsContent?.let {
-                    { onDismissRequest -> it(i, entry.sourceIndex, song, onDismissRequest) }
+                // The per-row heart is noise next to a checkbox, and its tap target
+                // competes with toggling the row.
+                disableHeartIcon = disableHeartIcon || isSelecting,
+                trailingOptionsContent = when {
+                    isSelecting -> null
+                    else -> trailingOptionsContent?.let {
+                        { onDismissRequest -> it(i, entry.sourceIndex, song, onDismissRequest) }
+                    }
+                },
+                onLongClick = when {
+                    // While reordering owns the long press, selection is reached from the
+                    // screen's overflow menu instead.
+                    selection == null || canReorder -> null
+                    else -> ({ selection.start(entry.uid) })
                 },
             ) {
-                context.symphony.radio.shorty.playQueue(
-                    displayedEntries.map { it.value },
-                    Radio.PlayOptions(index = i),
-                    source = playSource ?: PlaySource.song(song.path),
-                )
+                when {
+                    isSelecting -> selection?.toggle(entry.uid)
+                    else -> context.symphony.radio.shorty.playQueue(
+                        displayedEntries.map { it.value },
+                        Radio.PlayOptions(index = i),
+                        source = playSource ?: PlaySource.song(song.path),
+                    )
+                }
             }
         }
     }

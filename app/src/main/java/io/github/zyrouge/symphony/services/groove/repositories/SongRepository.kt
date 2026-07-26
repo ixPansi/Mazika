@@ -213,6 +213,60 @@ class SongRepository(private val symphony: Symphony) {
         }
     }
 
+    /**
+     * MAZIKA: applies one picked image to a batch of songs.
+     *
+     * The image is decoded, oriented, cropped and compressed **once**; every song after
+     * the first gets a copy of that result. Doing it per song would repeat the whole
+     * bitmap pipeline for an image the user picked once, which on a large selection is
+     * both slow and a good way to run out of memory.
+     */
+    fun setCustomCover(
+        songIds: Collection<String>,
+        sourceUri: Uri,
+        crop: CustomCovers.CropRegion? = null,
+        onResult: (Int) -> Unit,
+    ) {
+        val songs = songIds.mapNotNull(::get)
+        if (songs.isEmpty()) return onResult(0)
+        symphony.groove.coroutineScope.launch {
+            var applied = 0
+            var template: String? = null
+            songs.forEach { song ->
+                val name = when (val existing = template) {
+                    null -> CustomCovers.saveFromUri(
+                        symphony, song.id, sourceUri, crop, CustomCovers.SONG_DIRECTORY,
+                    )?.also { template = it }
+
+                    else -> CustomCovers.duplicateFor(
+                        symphony, existing, song.id, CustomCovers.SONG_DIRECTORY,
+                    )
+                } ?: return@forEach
+                val previous = customCovers.put(song.path, name)
+                symphony.database.songCovers.upsert(SongCover(song.path, name))
+                if (previous != null && previous != name) {
+                    CustomCovers.deleteAfterGracePeriod(
+                        symphony,
+                        previous,
+                        CustomCovers.SONG_DIRECTORY,
+                    )
+                }
+                // Per song: the media session caches a decoded bitmap per song id, so
+                // each one has to be told to drop it or the car and the lock screen keep
+                // showing the old art until the track changes.
+                onArtworkChanged(song.id)
+                applied++
+            }
+            emitIds()
+            withContext(Dispatchers.Main) { onResult(applied) }
+        }
+    }
+
+    /** MAZIKA: clears custom covers for a batch of songs. */
+    fun removeCustomCover(songIds: Collection<String>) {
+        songIds.forEach(::removeCustomCover)
+    }
+
     /** Clears a song's custom cover, restoring its embedded artwork. */
     fun removeCustomCover(songId: String) {
         val song = get(songId) ?: return

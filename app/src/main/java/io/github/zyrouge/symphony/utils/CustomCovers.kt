@@ -160,6 +160,36 @@ object CustomCovers {
         }
     }
 
+    /**
+     * MAZIKA: copies an already-stored cover so a second item can use the same image.
+     *
+     * Applying one picked image to a selection of songs decodes, orients, crops and
+     * re-compresses it once, then copies the result - rather than doing that work per
+     * song. Each song still gets its **own** file: they share a name only for as long as
+     * it takes to copy, so clearing one song's cover cannot delete the image out from
+     * under the others, and orphan cleanup stays a simple "is this name referenced".
+     *
+     * Returns the new file name, or null if the copy failed.
+     */
+    fun duplicateFor(
+        symphony: Symphony,
+        existingName: String,
+        targetId: String,
+        directory: String = PLAYLIST_DIRECTORY,
+    ): String? = runCatching {
+        val source = resolveFile(symphony, existingName, directory)
+        if (!source.isFile) return null
+        val dir = coversDir(symphony.applicationContext, directory)
+        if (!dir.exists()) dir.mkdirs()
+        val name = "${sanitizeId(targetId)}_${System.currentTimeMillis()}.webp"
+        val destination = File(dir, name)
+        source.copyTo(destination, overwrite = true)
+        name
+    }.getOrElse {
+        Logger.warn("CustomCovers", "failed to duplicate cover $existingName: $it")
+        null
+    }
+
     /** Deletes a stored cover file by name. Safe to call with a null/blank name. */
     fun delete(
         symphony: Symphony,

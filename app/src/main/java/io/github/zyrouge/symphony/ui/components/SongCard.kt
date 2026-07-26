@@ -2,7 +2,9 @@ package io.github.zyrouge.symphony.ui.components
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -62,6 +64,7 @@ import io.github.zyrouge.symphony.ui.view.AlbumViewRoute
 import io.github.zyrouge.symphony.ui.view.ArtistViewRoute
 import io.github.zyrouge.symphony.utils.Logger
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongCard(
     context: ViewContext,
@@ -69,10 +72,12 @@ fun SongCard(
     highlighted: Boolean = false,
     autoHighlight: Boolean = true,
     disableHeartIcon: Boolean = false,
+    selected: Boolean = false,
     leading: @Composable () -> Unit = {},
     thumbnailLabel: (@Composable () -> Unit)? = null,
     thumbnailLabelStyle: SongCardThumbnailLabelStyle = SongCardThumbnailLabelStyle.Default,
     trailingOptionsContent: (@Composable ColumnScope.(() -> Unit) -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val queue by context.symphony.radio.observatory.queue.collectAsState()
@@ -92,9 +97,18 @@ fun SongCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        onClick = onClick
+        // MAZIKA: combinedClickable rather than Card's own onClick, which cannot express
+        // a long press. The row is the entry point for selection mode on lists where
+        // drag-to-reorder is not already claiming that gesture.
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                else -> Color.Transparent
+            },
+        ),
     ) {
         Box(modifier = Modifier.padding(12.dp, 12.dp, 4.dp, 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

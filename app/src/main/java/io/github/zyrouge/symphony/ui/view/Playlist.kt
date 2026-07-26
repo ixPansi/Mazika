@@ -1,5 +1,6 @@
 package io.github.zyrouge.symphony.ui.view
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -39,14 +40,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.components.AnimatedNowPlayingBottomBar
 import io.github.zyrouge.symphony.ui.components.IconTextBody
 import io.github.zyrouge.symphony.ui.components.PlaylistDropdownMenu
 import io.github.zyrouge.symphony.ui.components.SongList
 import io.github.zyrouge.symphony.ui.components.SongListType
+import io.github.zyrouge.symphony.ui.components.SongSelectionTopAppBar
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.services.groove.PlaySource
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
+import io.github.zyrouge.symphony.ui.helpers.rememberSongSelectionState
 import io.github.zyrouge.symphony.ui.theme.ThemeColors
 import kotlinx.serialization.Serializable
 
@@ -80,58 +83,103 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
         updateCounter = if (updateCounter > 25) 0 else updateCounter + 1
     }
 
+    val selection = rememberSongSelectionState()
+    // Back leaves the selection before it leaves the screen.
+    BackHandler(enabled = selection.isActive) { selection.clear() }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            CenterAlignedTopAppBar(
-                navigationIcon = {
-                    IconButton(
-                        onClick = { context.navController.popBackStack() }
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
-                },
-                title = {
-                    TopAppBarMinimalTitle {
-                        Text(
-                            context.symphony.t.Playlist
-                                    + (playlist?.let { " - ${it.title}" } ?: "")
-                        )
-                    }
-                },
-                actions = {
-                    if (isViable) {
-                        IconButton(
-                            onClick = {
-                                showOptionsMenu = true
-                            }
-                        ) {
-                            Icon(Icons.Filled.MoreVert, null)
-                            PlaylistDropdownMenu(
-                                context,
-                                playlist!!,
-                                expanded = showOptionsMenu,
-                                includeShufflePlay = false,
-                                onSongsChanged = {
+            when {
+                selection.isActive -> SongSelectionTopAppBar(
+                    context,
+                    selection = selection,
+                    // Removing is by source index, not song id: a playlist may hold the
+                    // same song twice and only the picked copy should go.
+                    extraActions = { _, sourceIndices, onDismissRequest ->
+                        playlist?.takeIf { it.isNotLocal }?.let { target ->
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.DeleteForever,
+                                        null,
+                                        tint = ThemeColors.Red,
+                                    )
+                                },
+                                text = {
+                                    Text(context.symphony.t.RemoveFromPlaylist)
+                                },
+                                onClick = {
+                                    onDismissRequest()
+                                    val drop = sourceIndices.toSet()
+                                    context.symphony.groove.playlist.update(
+                                        target.id,
+                                        songIds.filterIndexed { i, _ -> i !in drop },
+                                    )
+                                    selection.clear()
                                     incrementUpdateCounter()
                                 },
-                                onRename = {
-                                    incrementUpdateCounter()
-                                },
-                                onDelete = {
-                                    context.navController.popBackStack()
-                                },
-                                onDismissRequest = {
-                                    showOptionsMenu = false
-                                }
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-            )
+                    },
+                )
+
+                else -> CenterAlignedTopAppBar(
+                    navigationIcon = {
+                        IconButton(
+                            onClick = { context.navController.popBackStack() }
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                        }
+                    },
+                    title = {
+                        TopAppBarMinimalTitle {
+                            Text(
+                                context.symphony.t.Playlist
+                                        + (playlist?.let { " - ${it.title}" } ?: "")
+                            )
+                        }
+                    },
+                    actions = {
+                        if (isViable) {
+                            IconButton(
+                                onClick = {
+                                    showOptionsMenu = true
+                                }
+                            ) {
+                                Icon(Icons.Filled.MoreVert, null)
+                                PlaylistDropdownMenu(
+                                    context,
+                                    playlist!!,
+                                    expanded = showOptionsMenu,
+                                    includeShufflePlay = false,
+                                    onSongsChanged = {
+                                        incrementUpdateCounter()
+                                    },
+                                    onRename = {
+                                        incrementUpdateCounter()
+                                    },
+                                    onDelete = {
+                                        context.navController.popBackStack()
+                                    },
+                                    // MAZIKA: reordering claims the long press on this
+                                    // screen, so selection is reached from the menu.
+                                    onSelect = {
+                                        showOptionsMenu = false
+                                        selection.startEmpty()
+                                    },
+                                    onDismissRequest = {
+                                        showOptionsMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    ),
+                )
+            }
         },
         content = { contentPadding ->
             Box(
@@ -143,6 +191,7 @@ fun PlaylistView(context: ViewContext, route: PlaylistViewRoute) {
                     isViable -> SongList(
                         context,
                         songIds = songIds,
+                        selection = selection,
                         trailingContent = {
                             item { Spacer(modifier = Modifier.height(72.dp)) }
                         },
