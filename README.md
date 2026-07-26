@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-orange.svg?style=flat-square)](./LICENSE)
 [![Android](https://img.shields.io/badge/Android-9%2B-orange.svg?style=flat-square)](#requirements)
-[![Release](https://img.shields.io/badge/release-v2026.7.119-orange.svg?style=flat-square)](https://github.com/ixPansi/Mazika/releases/latest)
+[![Release](https://img.shields.io/badge/release-v2026.7.120-orange.svg?style=flat-square)](https://github.com/ixPansi/Mazika/releases/latest)
 [![Built with](https://img.shields.io/badge/built%20with-Jetpack%20Compose-orange.svg?style=flat-square)](https://developer.android.com/jetpack/compose)
 
 </div>

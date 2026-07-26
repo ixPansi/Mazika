@@ -11,6 +11,23 @@ internal fun isSafeArtworkFileName(name: String): Boolean =
             !name.contains("..")
 
 /**
+ * MAZIKA: identifies the *contents* an artwork uri points at, so the uri changes whenever
+ * the file does.
+ *
+ * Android Auto caches browse icons by uri, persistently and across reconnects, and it does
+ * not retry one it has already failed to load. Custom covers normally dodge that because
+ * every save mints a new file name - but a file that never changes keeps its uri forever,
+ * so a fetch that failed for reasons *outside* the file (a missing permission grant, say)
+ * stays failed even after the app is fixed. That is exactly what left covers set before
+ * v2026.7.118 showing as blank tiles while covers set afterwards worked.
+ *
+ * Appending this token gives every previously published uri a new identity exactly once,
+ * then holds it stable for as long as the file is untouched.
+ */
+internal fun artworkVersionToken(lastModified: Long, length: Long): String =
+    "$lastModified-$length"
+
+/**
  * Resolves custom and embedded candidates in order. A null result means that the
  * candidate is missing or invalid, so resolution continues to the next source.
  */

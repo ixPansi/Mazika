@@ -401,6 +401,11 @@ class RadioSession(val symphony: Symphony) {
      * intent. Where the flag is dropped the client ends up holding a grant for a
      * directory, which is not a file, and every image request is denied. Granting the
      * exact uri as well costs one binder call per item and does not depend on that.
+     *
+     * Artwork uris carry a version query parameter, and a grant matches the whole uri. A
+     * client that drops the query before opening would therefore hold a grant that no
+     * longer matches what it asks for - so the bare form is granted too. One extra binder
+     * call buys immunity to a host we cannot inspect.
      */
     internal fun grantArtworkUri(uri: Uri) {
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
@@ -408,11 +413,21 @@ class RadioSession(val symphony: Symphony) {
             return
         }
         val context = symphony.applicationContext
+        val uris = when {
+            uri.query == null -> listOf(uri)
+            else -> listOf(uri, uri.buildUpon().clearQuery().build())
+        }
         browserClientPackages.forEach { client ->
-            runCatching {
-                context.grantUriPermission(client, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }.onFailure {
-                Logger.warn("RadioSession", "unable to grant $uri to $client: $it")
+            uris.forEach { target ->
+                runCatching {
+                    context.grantUriPermission(
+                        client,
+                        target,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }.onFailure {
+                    Logger.warn("RadioSession", "unable to grant $target to $client: $it")
+                }
             }
         }
     }

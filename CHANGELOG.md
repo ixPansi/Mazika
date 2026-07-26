@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026.7.120 — 2026-07-26
+
+### Fixed
+- **Custom covers set before 2026.7.118 stayed blank in Android Auto**, while covers set
+  afterwards worked. The 118 fixes were correct; what remained was the car's cache. Auto
+  stores browse icons keyed by their content URI, persistently and across reconnects, and
+  does not retry a URI it has already failed to load. A cover's URI only changes when the
+  file is re-saved, so every cover that failed *before* the fix kept the exact URI Auto had
+  already written off — which is why re-picking an image appeared to be the only cure.
+  Artwork URIs now carry a token derived from the file's modification time and size, so
+  each one changes exactly once and then stays stable while the file does. The car
+  re-fetches them and the covers appear, with nothing renamed on disk and no cover to
+  re-pick.
+  - The bare URI is granted alongside the versioned one, so a browser client that strips
+    the query before opening still holds a matching permission.
+
 ## 2026.7.119 — 2026-07-26
 
 ### Added

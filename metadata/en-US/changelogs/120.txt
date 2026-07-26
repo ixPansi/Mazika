@@ -1,0 +1,4 @@
+Custom covers set before the last update now appear in Android Auto.
+
+* The car caches artwork by address and never retries one it failed to load, so covers it gave up on stayed blank even after the fix that repaired them. Their address now changes whenever the image does, so the car fetches them again. No need to re-pick a cover.
+* Covers set after the last update were unaffected and stay as they are.

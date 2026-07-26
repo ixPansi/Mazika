@@ -96,6 +96,7 @@ class ArtworkProvider : ContentProvider() {
         private const val SEGMENT_COVERS = "covers"
         private const val SEGMENT_PLAYLIST_COVERS = "playlist_covers"
         private const val SEGMENT_SONG_COVERS = "song_covers"
+        internal const val QUERY_VERSION = "v"
 
         fun authority(context: Context) = "${context.packageName}.artwork"
 
@@ -121,11 +122,22 @@ class ArtworkProvider : ContentProvider() {
             SEGMENT_PLAYLIST_COVERS,
         ).map { Uri.parse("content://${authority(context)}/$it") }
 
+        /**
+         * The uri carries a version token for the file it points at - see
+         * [artworkVersionToken]. Only [openFile], [query] and [getType] consume these uris,
+         * and all three read the path alone, so a client that drops the query still
+         * resolves the same file: the worst case is a stale cache, never a broken image.
+         */
         private fun artworkUri(context: Context, segment: String, name: String): Uri? {
-            if (resolveArtworkFile(context, segment, name) == null) return null
-            return Uri.parse(
-                "content://${authority(context)}/$segment/${MediaId.encode(name)}"
-            )
+            // The file is resolved anyway to reject missing names, so the token is free.
+            val file = resolveArtworkFile(context, segment, name) ?: return null
+            return Uri.parse("content://${authority(context)}/$segment/${MediaId.encode(name)}")
+                .buildUpon()
+                .appendQueryParameter(
+                    QUERY_VERSION,
+                    artworkVersionToken(file.lastModified(), file.length()),
+                )
+                .build()
         }
 
         private fun resolveArtworkFile(context: Context, segment: String, name: String): File? {
