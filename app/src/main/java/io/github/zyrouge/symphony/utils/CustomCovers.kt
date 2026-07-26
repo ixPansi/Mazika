@@ -33,7 +33,18 @@ object CustomCovers {
     const val SONG_DIRECTORY = "song_covers"
     const val MAX_SIZE = 1024
     private const val QUALITY = 85
-    internal const val RETIRED_COVER_GRACE_MS = 10 * 60 * 1000L
+    /**
+     * How long a replaced cover file is kept after a new one takes its place.
+     *
+     * Every save mints a new file name, which is what busts Coil's and Android Auto's
+     * image caches. But Auto also caches the *browse tree* - the content uris it was
+     * handed - for far longer than one session, and across reconnects. Ten minutes meant
+     * a cover changed in the morning left a blank tile in the car that afternoon, because
+     * the uri Auto still held pointed at a file that had been deleted. A week comfortably
+     * outlives that cache; these are single images in internal storage, so the disk cost
+     * of holding them is negligible.
+     */
+    internal const val RETIRED_COVER_GRACE_MS = 7 * 24 * 60 * 60 * 1000L
 
     fun coversDir(context: Context, directory: String = PLAYLIST_DIRECTORY): File =
         File(context.filesDir, directory)

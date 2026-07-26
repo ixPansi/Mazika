@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026.7.118 — 2026-07-26
+
+### Fixed
+- **Custom covers were being deleted off the device.** `PlaylistRepository.fetch()` ran
+  orphan cleanup *outside* the `try` that loads the playlists, so when a local `.m3u`
+  failed to parse — which is exactly what happens when Android Auto cold-starts the
+  process and the persisted document permission is unavailable — every playlist after the
+  failing one was missing from the cache, and its cover file was treated as unreferenced
+  and removed. Cleanup now runs only after a complete load, and a single unreadable
+  playlist no longer aborts the rest of the loop. The same guard covers song covers.
+- **Replaced covers vanished from Android Auto.** Each save writes a new file name, and
+  the previous file was deleted after ten minutes. Auto caches the browse tree — and the
+  content URIs inside it — across sessions and reconnects, so it would later ask for a
+  file that no longer existed and draw nothing. Retired covers are now kept for a week.
+- **Cover art in the car had no permission to be read.** The only grant in the app was a
+  prefix grant on three directory roots, issued once at connect.
+  `Context.grantUriPermission` does not honour `FLAG_GRANT_PREFIX_URI_PERMISSION` on every
+  platform build — it is dependable only for grants carried on an intent — so on some
+  devices the client held a grant for a directory, which is not a file, and every image
+  was denied. Each icon URI is now granted explicitly as it is published, and the browse
+  and search paths register their caller too rather than relying on `onGetRoot` alone.
+- **MAZIKA went missing from Android Auto until something restarted.** Switching theme
+  preset rewrote package component state six times — one enable plus five redundant
+  disables — firing a burst of `ACTION_PACKAGE_CHANGED` for the app. Android Auto rebuilds
+  its media-app list from those broadcasts, and the burst left it stale. Only aliases that
+  are actually enabled are touched now, and the call no longer runs on the main thread
+  during startup.
+- The media browser service published its session token *after* work that could fail. If
+  that work threw, the token was never set, so every connection attempt hung forever
+  rather than failing — which from the car is indistinguishable from the app not existing.
+  The token is now published first, and `onGetRoot` no longer throws across the binder.
+- `ArtworkProvider` answered `null` to metadata queries and described everything as
+  `image/*`. Image loaders that probe `DISPLAY_NAME`/`SIZE` before opening got nothing and
+  gave up without ever requesting the file.
+
+### Security
+- **Any app on the device could browse the entire music library.** `onGetRoot` accepted
+  every caller without inspecting it, and handed each one read grants on the app's
+  otherwise-unexported artwork provider. Callers are now checked: this app, holders of the
+  system media-control permission, and known media hosts that are genuinely part of the
+  system image. Rejections are logged so a wrong entry is diagnosable.
+
 ## 2026.7.117 — 2026-07-26
 
 ### Added

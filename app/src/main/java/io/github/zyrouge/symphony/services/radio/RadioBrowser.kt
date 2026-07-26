@@ -1,5 +1,6 @@
 package io.github.zyrouge.symphony.services.radio
 
+import android.net.Uri
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import io.github.zyrouge.symphony.Symphony
@@ -293,13 +294,26 @@ class RadioBrowser(private val symphony: Symphony) {
         return MediaItem(description, MediaItem.FLAG_BROWSABLE)
     }
 
+    /**
+     * MAZIKA: hands the uri to the connected browser clients before it is published.
+     *
+     * A browse item's icon is fetched by the *client* process, which can only open the
+     * app's unexported artwork provider if it holds a grant for that exact uri. Nothing
+     * on this path granted anything before - the only grant in the app was a directory
+     * prefix issued once at connect, and prefix grants are not honoured everywhere.
+     */
+    private fun grantedArtworkUri(uri: Uri): Uri {
+        symphony.radio.session.grantArtworkUri(uri)
+        return uri
+    }
+
     private fun songItem(songId: String, contextType: String?, contextId: String?): MediaItem? {
         val song = symphony.groove.song.get(songId) ?: return null
         val description = MediaDescriptionCompat.Builder()
             .setMediaId(MediaId.of(MediaId.TYPE_SONG, songId, contextType, contextId))
             .setTitle(song.title)
             .setSubtitle(song.artists.joinToString().ifEmpty { null })
-            .setIconUri(symphony.radio.artworkUris.song(song.id))
+            .setIconUri(grantedArtworkUri(symphony.radio.artworkUris.song(song.id)))
             .build()
         return MediaItem(description, MediaItem.FLAG_PLAYABLE)
     }
@@ -311,7 +325,11 @@ class RadioBrowser(private val symphony: Symphony) {
             .setTitle(album.name)
             .setSubtitle(album.artists.joinToString().ifEmpty { null })
             .setIconUri(
-                symphony.radio.artworkUris.firstSong(symphony.groove.album.getSongIds(albumId))
+                grantedArtworkUri(
+                    symphony.radio.artworkUris.firstSong(
+                        symphony.groove.album.getSongIds(albumId)
+                    )
+                )
             )
             .build()
         return MediaItem(description, MediaItem.FLAG_BROWSABLE)
@@ -322,8 +340,10 @@ class RadioBrowser(private val symphony: Symphony) {
             .setMediaId(MediaId.of(MediaId.TYPE_ARTIST, artistName))
             .setTitle(artistName)
             .setIconUri(
-                symphony.radio.artworkUris.firstSong(
-                    symphony.groove.artist.getSongIds(artistName)
+                grantedArtworkUri(
+                    symphony.radio.artworkUris.firstSong(
+                        symphony.groove.artist.getSongIds(artistName)
+                    )
                 )
             )
             .build()
@@ -334,7 +354,7 @@ class RadioBrowser(private val symphony: Symphony) {
         val description = MediaDescriptionCompat.Builder()
             .setMediaId(MediaId.of(MediaId.TYPE_PLAYLIST, playlist.id))
             .setTitle(playlist.title)
-            .setIconUri(symphony.radio.artworkUris.playlist(playlist))
+            .setIconUri(grantedArtworkUri(symphony.radio.artworkUris.playlist(playlist)))
             .build()
         return MediaItem(description, MediaItem.FLAG_BROWSABLE)
     }

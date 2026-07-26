@@ -164,18 +164,22 @@ class SongRepository(private val symphony: Symphony) {
 
     /** Loads stored custom covers; called once the library has been scanned. */
     internal suspend fun fetchCustomCovers() {
-        try {
-            val entries = symphony.database.songCovers.entries()
-            customCovers.clear()
-            entries.forEach { customCovers[it.path] = it.coverFile }
-            CustomCovers.cleanupOrphans(
-                symphony,
-                customCovers.values.toSet(),
-                CustomCovers.SONG_DIRECTORY,
-            )
+        // MAZIKA: load first, and only clean up once the full set is in hand. Cleanup
+        // deletes every cover file not present in the map, so running it after a partial
+        // load takes the user's images off disk for good.
+        val entries = try {
+            symphony.database.songCovers.entries()
         } catch (err: Exception) {
             Logger.error("SongRepository", "unable to load custom covers", err)
+            return
         }
+        customCovers.clear()
+        entries.forEach { customCovers[it.path] = it.coverFile }
+        CustomCovers.cleanupOrphans(
+            symphony,
+            customCovers.values.toSet(),
+            CustomCovers.SONG_DIRECTORY,
+        )
     }
 
     /** Stores a user-selected image as this song's cover. */

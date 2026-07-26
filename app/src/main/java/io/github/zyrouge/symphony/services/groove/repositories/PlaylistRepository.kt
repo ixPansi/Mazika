@@ -63,17 +63,37 @@ class PlaylistRepository(private val symphony: Symphony) {
 
     suspend fun fetch() {
         emitUpdate(true)
+        // MAZIKA: whether every stored playlist made it into the cache. Orphan cleanup
+        // deletes cover files that no playlist references, so running it against a
+        // partially loaded cache destroys the covers of the playlists that failed to
+        // load - permanently, and off disk. Only clean up when the whole set is present.
+        var loadedCleanly = true
         try {
             val context = symphony.applicationContext
             val playlists = symphony.database.playlists.entries()
             playlists.values.map { x ->
                 val playlist = when {
                     x.isLocal -> {
-                        ActivityUtils.makePersistableReadableUri(context, x.uri!!)
-                        // Re-parsing a local playlist rebuilds it from its .m3u file,
-                        // so carry over the stored custom cover reference.
-                        Playlist.parse(symphony, x.id, x.uri)
-                            .copy(customCoverPath = x.customCoverPath)
+                        // A single unreadable .m3u must not cost every later playlist its
+                        // cover, so a parse failure falls back to the stored row rather
+                        // than aborting the loop. Playlist.parse dereferences the
+                        // document uri, which throws when the persisted read permission
+                        // is gone - exactly what happens when Android Auto cold-starts
+                        // the process with no activity.
+                        runCatching {
+                            ActivityUtils.makePersistableReadableUri(context, x.uri!!)
+                            // Re-parsing a local playlist rebuilds it from its .m3u file,
+                            // so carry over the stored custom cover reference.
+                            Playlist.parse(symphony, x.id, x.uri)
+                                .copy(customCoverPath = x.customCoverPath)
+                        }.getOrElse { err ->
+                            loadedCleanly = false
+                            Logger.warn(
+                                "PlaylistRepository",
+                                "unable to parse local playlist ${x.id}: $err",
+                            )
+                            x
+                        }
                     }
 
                     else -> x
@@ -89,17 +109,26 @@ class PlaylistRepository(private val symphony: Symphony) {
                 add(getFavorites())
             }
         } catch (_: FileNotFoundException) {
+            loadedCleanly = false
         } catch (err: Exception) {
+            loadedCleanly = false
             Logger.error("PlaylistRepository", "fetch failed", err)
         }
         _favorites.update {
             getFavorites().getSongIds(symphony)
         }
         // Remove cover files no longer referenced by any playlist.
-        CustomCovers.cleanupOrphans(
-            symphony,
-            cache.values.mapNotNull { it.customCoverPath }.toSet(),
-        )
+        when {
+            loadedCleanly -> CustomCovers.cleanupOrphans(
+                symphony,
+                cache.values.mapNotNull { it.customCoverPath }.toSet(),
+            )
+
+            else -> Logger.warn(
+                "PlaylistRepository",
+                "skipping cover cleanup: playlists did not load completely",
+            )
+        }
         emitUpdateId()
         emitUpdate(false)
     }

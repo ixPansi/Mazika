@@ -2,6 +2,7 @@ package io.github.zyrouge.symphony.services.radio
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -347,7 +348,10 @@ class RadioSession(val symphony: Symphony) {
                         .setSubtitle(song.artists.joinToString().ifEmpty { null })
                         // Artwork as a content URI, never a bitmap: 200 bitmaps in one
                         // queue parcel is a guaranteed TransactionTooLargeException.
-                        .setIconUri(symphony.radio.artworkUris.song(songId))
+                        .setIconUri(
+                            symphony.radio.artworkUris.song(songId)
+                                .also(::grantArtworkUri)
+                        )
                         .build()
                     MediaSessionCompat.QueueItem(description, index.toLong())
                 }
@@ -384,6 +388,31 @@ class RadioSession(val symphony: Symphony) {
                 context.grantUriPermission(client, uri, flags)
             } catch (err: Exception) {
                 Logger.warn("RadioSession", "unable to grant $uri to $client: $err")
+            }
+        }
+    }
+
+    /**
+     * MAZIKA: grants one artwork uri to every connected browser client.
+     *
+     * The directory prefix grant above is the cheap path, but
+     * [Context.grantUriPermission] does not honour [Intent.FLAG_GRANT_PREFIX_URI_PERMISSION]
+     * on every platform build - prefix grants are only dependable when they ride on an
+     * intent. Where the flag is dropped the client ends up holding a grant for a
+     * directory, which is not a file, and every image request is denied. Granting the
+     * exact uri as well costs one binder call per item and does not depend on that.
+     */
+    internal fun grantArtworkUri(uri: Uri) {
+        if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
+            // The fallback placeholder is an android.resource:// uri, readable by anyone.
+            return
+        }
+        val context = symphony.applicationContext
+        browserClientPackages.forEach { client ->
+            runCatching {
+                context.grantUriPermission(client, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }.onFailure {
+                Logger.warn("RadioSession", "unable to grant $uri to $client: $it")
             }
         }
     }

@@ -9,9 +9,12 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import io.github.zyrouge.symphony.ui.theme.ThemeIcons
 import io.github.zyrouge.symphony.ui.view.BaseView
 import io.github.zyrouge.symphony.utils.Logger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 class MainActivity : ComponentActivity() {
@@ -70,7 +73,11 @@ class MainActivity : ComponentActivity() {
         symphony.emitActivityReady()
         // MAZIKA: keep the launcher icon in step with the saved theme preset (e.g.
         // after a reinstall, where component states reset to the manifest defaults).
-        ThemeIcons.apply(applicationContext, symphony.settings.themePreset.value)
+        // Off the main thread: reading and writing component state are synchronous
+        // binder calls to the package manager, and this runs on every cold start.
+        lifecycleScope.launch(Dispatchers.IO) {
+            ThemeIcons.apply(applicationContext, symphony.settings.themePreset.value)
+        }
         attachHandlers()
 
         enableEdgeToEdge()

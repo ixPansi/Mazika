@@ -1,0 +1,5 @@
+Android Auto fixes.
+
+* Custom covers you set for playlists and songs now load in the car. Some were being deleted off your phone entirely when a playlist failed to load, and replaced covers were removed after ten minutes while Android Auto was still asking for them.
+* MAZIKA should appear in the car without restarting the phone or the head unit. Changing theme presets was rewriting the app's launcher entries six times over, which left Android Auto's app list stale.
+* Other apps can no longer browse your library.

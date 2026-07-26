@@ -32,6 +32,19 @@ class CustomCoversTest {
     }
 
     @Test
+    fun retiredCover_outlivesAnAndroidAutoBrowseCache() {
+        // Android Auto caches the browse tree, and the content uris inside it, across
+        // sessions and reconnects. At ten minutes a cover replaced in the morning left a
+        // blank tile in the car that afternoon, because the uri Auto still held pointed
+        // at a file that had already been deleted. Anything under a day reopens that.
+        val oneDay = 24 * 60 * 60 * 1000L
+        assertTrue(
+            CustomCovers.RETIRED_COVER_GRACE_MS >= oneDay,
+            "retired covers must outlive Android Auto's browse cache",
+        )
+    }
+
+    @Test
     fun retiredCover_isKeptUntilGracePeriodEnds() {
         val now = 1_000_000L
         assertFalse(

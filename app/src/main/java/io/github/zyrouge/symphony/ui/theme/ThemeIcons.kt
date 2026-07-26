@@ -47,9 +47,15 @@ object ThemeIcons {
             // Enable the new alias before disabling the old one, so the app never
             // has zero launcher entries (which can drop it from the home screen).
             setEnabled(packageManager, context, target, true)
+            // Only touch aliases that are actually enabled. This used to disable all
+            // five others unconditionally, so one preset change wrote package state six
+            // times and fired six ACTION_PACKAGE_CHANGED broadcasts for this package.
+            // Android Auto rebuilds its media-app list from those broadcasts, and a
+            // burst of them is a good way to leave that list stale until the phone or
+            // the head unit restarts.
             allAliases
                 .map { ALIAS_PREFIX + it }
-                .filter { it != target }
+                .filter { it != target && isEnabled(packageManager, context, it) }
                 .forEach { setEnabled(packageManager, context, it, false) }
         } catch (err: Exception) {
             Logger.error("ThemeIcons", "unable to switch launcher icon", err)

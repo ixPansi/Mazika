@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class RadioBrowserService : MediaBrowserServiceCompat() {
     private lateinit var symphony: Symphony
     private lateinit var browser: RadioBrowser
+    private lateinit var validator: PackageValidator
     private var artworkChangeUnsubscribe: EventUnsubscribeFn? = null
     private val delayedReadinessParents = ConcurrentHashMap.newKeySet<String>()
     private val readinessRefreshScheduled = AtomicBoolean()
@@ -40,18 +41,43 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         // being bound cannot start playback machinery or take down the process.
         try {
             symphony = SymphonyProvider.get(application)
-            browser = RadioBrowser(symphony)
+            // Publish the token before anything else that can fail. Without it
+            // MediaBrowserServiceCompat parks every incoming connection indefinitely, so
+            // a host that binds gets neither content nor an error - indistinguishable,
+            // from the car's side, from the app not being there at all.
             sessionToken = symphony.radio.session.mediaSession.sessionToken
+            validator = PackageValidator(applicationContext)
+        } catch (err: Throwable) {
+            Logger.error("RadioBrowserService", "initialisation failed", err)
+            stopSelf()
+            return
+        }
+        // Past this point a failure degrades browsing but must not leave the service
+        // bound-but-mute, so it is guarded separately from the token.
+        runCatching {
+            browser = RadioBrowser(symphony)
             artworkChangeUnsubscribe = symphony.radio.session.onBrowseChildrenChanged
                 .subscribe { parentIds ->
                     symphony.groove.coroutineScope.launch(Dispatchers.Main) {
                         if (!destroyed) notifyBrowseParents(parentIds)
                     }
                 }
-        } catch (err: Throwable) {
-            Logger.error("RadioBrowserService", "initialisation failed", err)
-            stopSelf()
+        }.onFailure {
+            Logger.error("RadioBrowserService", "browse setup failed", it)
         }
+    }
+
+    /**
+     * Re-registers whichever client is currently talking to us.
+     *
+     * Artwork grants are per-client, and `onGetRoot` is not guaranteed to run again when
+     * a host reconnects or when a second one attaches. Registering here as well means a
+     * browse result never carries icon uris the caller cannot open.
+     */
+    private fun registerCurrentBrowser() {
+        runCatching { currentBrowserInfo?.packageName }
+            .getOrNull()
+            ?.let { symphony.radio.session.registerBrowserClient(it) }
     }
 
     /** Initialises the app on demand, when a browser client actually asks for content. */
@@ -67,15 +93,31 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         clientPackageName: String,
         clientUid: Int,
         rootHints: Bundle?,
-    ): BrowserRoot {
-        // Prefix access is granted immediately, including for queue URIs that were
-        // published before this browser connected.
-        symphony.radio.session.registerBrowserClient(clientPackageName)
-        return BrowserRoot(MediaId.ROOT, null)
+    ): BrowserRoot? {
+        // This runs on a binder thread. Anything thrown here propagates to the host,
+        // which drops the connection and caches the failure - so the whole body is
+        // guarded, unlike before, where an uninitialised `symphony` after a failed
+        // bootstrap threw straight across the binder.
+        return try {
+            if (!validator.isKnownCaller(clientPackageName, clientUid)) {
+                null
+            } else {
+                // Prefix access is granted immediately, including for queue URIs that
+                // were published before this browser connected.
+                symphony.radio.session.registerBrowserClient(clientPackageName)
+                BrowserRoot(MediaId.ROOT, null)
+            }
+        } catch (err: Throwable) {
+            Logger.error("RadioBrowserService", "onGetRoot failed for $clientPackageName", err)
+            // An empty-but-valid root keeps the handshake honest: the host connects and
+            // simply sees nothing, rather than treating the app as broken.
+            BrowserRoot(MediaId.ROOT, null)
+        }
     }
 
     override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaItem>>) {
         result.detach()
+        registerCurrentBrowser()
         ensureReady()
         symphony.groove.coroutineScope.launch {
             val items = try {
@@ -108,6 +150,7 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         result: Result<MutableList<MediaItem>>,
     ) {
         result.detach()
+        registerCurrentBrowser()
         ensureReady()
         symphony.groove.coroutineScope.launch {
             val items = try {
