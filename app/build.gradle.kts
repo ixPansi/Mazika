@@ -7,6 +7,16 @@ plugins {
     alias(libs.plugins.room)
 }
 
+val mazikaGithubRepository = providers.gradleProperty("MAZIKA_GITHUB_REPOSITORY")
+    .orElse(providers.environmentVariable("MAZIKA_GITHUB_REPOSITORY"))
+    .orElse(providers.environmentVariable("GITHUB_REPOSITORY"))
+    .orElse("ixPansi/Mazika")
+    .get()
+    .trim()
+val mazikaGithubRepositoryBuildConfigValue = mazikaGithubRepository
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 android {
     namespace = "io.github.zyrouge.symphony"
     compileSdk = libs.versions.compile.sdk.get().toInt()
@@ -19,9 +29,14 @@ android {
         minSdk = libs.versions.min.sdk.get().toInt()
         targetSdk = libs.versions.target.sdk.get().toInt()
 
-        versionCode = 115
-        versionName = "2024.12.115"
+        versionCode = 116
+        versionName = "2026.7.116"
         versionName = System.getenv("APP_VERSION_NAME") ?: versionName
+        buildConfigField(
+            "String",
+            "MAZIKA_GITHUB_REPOSITORY",
+            "\"$mazikaGithubRepositoryBuildConfigValue\"",
+        )
 
         vectorDrawables {
             useSupportLibrary = true

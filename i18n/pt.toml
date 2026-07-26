@@ -3,16 +3,6 @@ locale = "pt"
 
 [keys]
 UnknownSymbol = "?"
-HelloThere = "Olá!"
-IntroductoryMessage = """
-Obrigado por fazer parte do MAZIKA open-beta. Se encontrar algum bug ou quiser sugerir melhorias, por favor, abra um problema em nosso repositório no Github.
-
-Junte-se à nossa comunidade no Discord e Reddit para compartilhar seus comentários e ficar atualizado com o desenvolvimento.
-
-O MAZIKA é totalmente gratuito e é apoiado exclusivamente por contribuições de pessoas generosas. Qualquer contribuição será muito apreciada.
-
-Mais uma vez, obrigado por experimentar o MAZIKA!
-"""
 Songs = "Músicas"
 Artists = "Artistas"
 Albums = "Álbuns"
@@ -199,7 +189,6 @@ RenamePlaylist = "Renomear lista de reprodução"
 Rename = "Renomear"
 Equalizer = "Equalizador"
 LaunchingEqualizerFailedX = "Falha ao iniciar o equalizador (Erro: {x})"
-ConsiderContributing = "Considere contribuir!"
 Lyrics = "Letras"
 LyricsLayout = "Layout das letras"
 ReplaceArtwork = "Substituir capa"

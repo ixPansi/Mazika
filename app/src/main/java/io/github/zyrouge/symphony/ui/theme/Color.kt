@@ -52,8 +52,8 @@ object ThemeColors {
     val Neutral800 = Color(0xFF262626)
     val Neutral900 = Color(0xFF171717)
 
-    // MAZIKA defaults to its own brand red rather than Symphony's purple.
-    val DefaultPrimaryColor = PrimaryThemeColor.MazikaRed
+    // MAZIKA defaults to Sunset orange rather than Symphony's purple.
+    val DefaultPrimaryColor = PrimaryThemeColor.Orange
     val PrimaryColorsMap = mapOf(
         PrimaryThemeColor.MazikaRed to MazikaRed,
         PrimaryThemeColor.Red to Red,

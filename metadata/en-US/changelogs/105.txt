@@ -1,3 +1,0 @@
-* Fix search input overflow beyond window.
-* Show track number in Album page.
-* Updated French, Japanese and Uchinaguchi translations.

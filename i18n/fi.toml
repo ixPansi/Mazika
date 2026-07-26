@@ -2,16 +2,6 @@ locale = "fi"
 
 [keys]
 UnknownSymbol = "?"
-HelloThere = "Hei siellä!"
-IntroductoryMessage = """
-Kiitos osallistumisestasi MAZIKAn avoimeen betaan. Jos kohtaat virheitä tai haluat antaa parannusehdotuksia, avaa kysymys GitHub-repositoriossamme.
-
-Liity Discord- ja Reddit-yhteisöihimme antaaksesi palautetta ja pysyäksesi ajan tasalla kehityksestä.
-
-MAZIKA on täysin ilmainen sovellus, jota ylläpidetään vapaaehtoisvoimin. Osallistuminen on erittäin tervetullutta.
-
-Kiitos, kun käytät MAZIKAä!
-"""
 Songs = "Kappaleet"
 Artists = "Artistit"
 Albums = "Albumit"
@@ -198,7 +188,6 @@ RenamePlaylist = "Uudelleennimeä soittolista"
 Rename = "Uudelleennimeä"
 Equalizer = "Taajuuskorjain (EQ)"
 LaunchingEqualizerFailedX = "Taajuuskorjaimen avaaminen epäonnistui (Virhe: {x})"
-ConsiderContributing = "Harkitse osallistumista!"
 Lyrics = "Lyriikat"
 LyricsLayout = "Lyriikoiden asettelu"
 ReplaceArtwork = "Korvaa kuvitus"

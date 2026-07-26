@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2026.7.116 — 2026-07-26
+
+First public release. Everything below, plus the fork baseline in the section after
+it, ships together in this version.
 
 ### Added
 - **Recently played** at the top of For You — the things you played *from*: playlists,
@@ -88,6 +91,17 @@
   worth keeping.
 
 ### Changed
+- Fresh installs now use the Sunset preset, lossless artwork, six-second track fades
+  without pause/resume fading, the requested Home and Now Playing layouts, and a
+  Playlists-first Android Auto category order.
+- Android Auto artwork now validates missing files, falls back consistently, grants
+  connected clients before republishing existing queues, and refreshes browse/queue
+  metadata when custom covers change.
+- Update checks now target the repository configured at build time instead of the
+  upstream project, compare release versions numerically, and open the exact GitHub
+  release from an actionable in-app notice.
+- Removed the open-beta dialog, contribution banners, and inherited community/store
+  links; public release artifacts and store metadata now use MAZIKA branding.
 - **A song's favourite toggle is now on the row itself**, immediately before the
   overflow menu — filled when favourited, outlined when not. The heart used to appear
   only once a song was *already* a favourite, which made it an un-favourite button and
@@ -104,7 +118,7 @@
   scanner and the songs table lives in the cache database, so an id-keyed cover
   would vanish on the next rescan. Room `PersistentDatabase` migrated 2 → 3.
 
-## MAZIKA 2024.12.115 (initial MAZIKA release)
+## 2024.12.115 — fork baseline (never published)
 
 Based on Symphony upstream commit `dd04b872b8b4e6dd56172c053a5776c4d56ad080`.
 

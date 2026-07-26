@@ -25,7 +25,7 @@ object ThemeIcons {
         .mapNotNull { it.aliasSuffix }
         .distinct()
 
-    /** Alias for a preset; [ThemePreset.Custom] keeps the brand default. */
+    /** Alias for a preset; [ThemePreset.Custom] keeps the default preset icon. */
     private fun aliasFor(preset: ThemePreset): String =
         ALIAS_PREFIX + (preset.aliasSuffix ?: ThemePreset.Default.aliasSuffix!!)
 
@@ -66,8 +66,8 @@ object ThemeIcons {
         )
         return when (state) {
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
-            // DEFAULT means "whatever the manifest says"; only the brand alias ships
-            // enabled, so that is the one that is live before any user choice.
+            // DEFAULT means "whatever the manifest says"; only the default preset's
+            // alias ships enabled, so it is live before any user choice.
             PackageManager.COMPONENT_ENABLED_STATE_DEFAULT ->
                 alias == ALIAS_PREFIX + ThemePreset.Default.aliasSuffix
             else -> false

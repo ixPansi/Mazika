@@ -6,6 +6,10 @@ import { Paths } from "../helpers/paths";
 
 const phraseyConfig = path.join(Paths.rootDir, ".phrasey/config.toml");
 const outputDir = path.join(Paths.rootDir, "phrasey-dist");
+const githubRepository = process.env.GITHUB_REPOSITORY;
+const repositoryUrl = githubRepository
+    ? `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${githubRepository}`
+    : undefined;
 
 const start = async () => {
     const summaryResult = await PhraseyBuilder.summary({
@@ -33,20 +37,26 @@ const start = async () => {
     await fs.writeFile(
         mdPath,
         `
-# Symphony i18n
+# MAZIKA i18n
 
 > Last updated at ${new Date().toLocaleString()}
 
-Read [Translations Guide](https://github.com/zyrouge/symphony/wiki/Translations-Guide) on how Symphony handles localization.
+${
+    repositoryUrl
+        ? `Read [Translations Guide](${repositoryUrl}/wiki/Translations-Guide) on how MAZIKA handles localization.`
+        : "MAZIKA localization status."
+}
 
 | Status | Locale | % Translated |
 | --- | --- | --- |
 ${Object.entries(summary.individual)
     .map(([locale, x]) => {
         const status = x.set.percent === 100 ? "✅" : "⚠️";
-        const url = `https://github.com/zyrouge/symphony/blob/main/i18n/${locale}.toml`;
+        const localeLabel = repositoryUrl
+            ? `[\`${locale}\`](${repositoryUrl}/blob/main/i18n/${locale}.toml)`
+            : `\`${locale}\``;
         const percentage = `${x.set.percent.toFixed(1)}%`;
-        return `| ${status} | [\`${locale}\`](${url}) | ${percentage} |`;
+        return `| ${status} | ${localeLabel} | ${percentage} |`;
     })
     .join("\n")}
         `.trim(),

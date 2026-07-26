@@ -27,7 +27,7 @@ enum class AndroidAutoCategory(val mediaId: String) {
     }
 
     companion object {
-        /** Default order, matching the phone's own library ordering. */
-        val Default = listOf(SONGS, ALBUMS, ARTISTS, PLAYLISTS, GENRES, FOLDERS)
+        /** Fresh-install categories in their default root-screen order. */
+        val Default = listOf(PLAYLISTS, SONGS, ARTISTS, GENRES, ALBUMS)
     }
 }

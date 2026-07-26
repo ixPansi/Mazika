@@ -2,16 +2,6 @@ locale = "en"
 
 [keys]
 UnknownSymbol = "?"
-HelloThere = "Hello there!"
-IntroductoryMessage = """
-Thank you for being a part of MAZIKA open-beta. If you encounter any bugs or want to suggest improvements, kindly open an issue in our Github Repository.
-
-Join our Discord and Reddit community to share you feedback and to stay up-to-date with the development.
-
-MAZIKA is totally free-to-use and entirely supported by contributions made by kindhearted individuals. Any contribution will be highly appreciated.
-
-Once again, thank you for trying out MAZIKA!
-"""
 Songs = "Songs"
 Artists = "Artists"
 Albums = "Albums"
@@ -53,6 +43,9 @@ FilteringResults = "Filtering results..."
 Appearance = "Appearance"
 About = "About"
 Github = "Github"
+SourceCode = "Source code"
+License = "License"
+AboutNotice = "MAZIKA is an independent fork of Symphony by Zyrouge. It is free software licensed under the GNU AGPL-3.0 and comes with absolutely no warranty."
 Play = "Play"
 Previous = "Previous"
 Next = "Next"
@@ -218,7 +211,6 @@ UnableToSavePlaylistCover = "Unable to save playlist cover"
 Rename = "Rename"
 Equalizer = "Equalizer"
 LaunchingEqualizerFailedX = "Launching equalizer failed (Error: {x})"
-ConsiderContributing = "Consider contributing!"
 Lyrics = "Lyrics"
 LyricsLayout = "Lyrics layout"
 ReplaceArtwork = "Replace artwork"
@@ -266,7 +258,7 @@ ArtworkQuality = "Artwork quality"
 Low = "Low"
 Medium = "Medium"
 High = "High"
-Loseless = "Loseless"
+Loseless = "Lossless"
 UseMetaphonyMetadataDecoder = "Use Metaphony metadata decoder"
 PlayStore = "Play Store"
 GaplessPlayback = "Gapless playback"

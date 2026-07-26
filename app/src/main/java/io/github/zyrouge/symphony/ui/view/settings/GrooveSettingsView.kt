@@ -47,7 +47,6 @@ import io.github.zyrouge.symphony.services.groove.Groove
 import io.github.zyrouge.symphony.ui.components.AdaptiveSnackbar
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.ui.components.settings.ConsiderContributingTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsMultiGrooveFolderTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsMultiSystemFolderTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsMultiTextOptionTile
@@ -127,7 +126,6 @@ fun GrooveSettingsView(context: ViewContext, route: GrooveSettingsViewRoute) {
                     val defaultSongsFilterPattern = ".*"
                     val minSongDurationRange = 0f..60f
 
-                    ConsiderContributingTile(context)
                     SettingsSideHeading(context.symphony.t.Groove)
                     SpotlightTile(route.initialElement == SettingsViewRoute.ELEMENT_MEDIA_FOLDERS) {
                         SettingsMultiSystemFolderTile(

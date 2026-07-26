@@ -1,0 +1,8 @@
+First public MAZIKA release.
+
+* Android Auto: browse Songs, Albums, Artists, Playlists, Genres and Folders, search by voice, and see cover art in the queue. Pick which categories appear and in what order.
+* Custom covers for playlists and songs.
+* Recently played on For You - the albums, artists and playlists you played from.
+* Rewritten drag-to-reorder in playlists, the queue, home tabs and car categories.
+* Favourite a song straight from its row.
+* Six one-tap theme presets; the launcher icon follows your theme.

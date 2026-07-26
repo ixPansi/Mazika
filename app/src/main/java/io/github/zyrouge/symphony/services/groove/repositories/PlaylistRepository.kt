@@ -56,6 +56,11 @@ class PlaylistRepository(private val symphony: Symphony) {
         cache.size
     }
 
+    private fun emitArtworkChanged(playlistId: String) {
+        runCatching { symphony.radio.session.refreshPlaylistArtwork(playlistId) }
+            .onFailure { Logger.warn("PlaylistRepository", "unable to refresh artwork: $it") }
+    }
+
     suspend fun fetch() {
         emitUpdate(true)
         try {
@@ -178,7 +183,7 @@ class PlaylistRepository(private val symphony: Symphony) {
         symphony.groove.coroutineScope.launch {
             symphony.database.playlists.delete(id)
             // Clean up the app-owned custom cover file (never the user's gallery).
-            CustomCovers.delete(symphony, removed?.customCoverPath)
+            CustomCovers.deleteAfterGracePeriod(symphony, removed?.customCoverPath)
         }
     }
 
@@ -195,6 +200,7 @@ class PlaylistRepository(private val symphony: Symphony) {
         cache[id] = updated
         emitUpdateId()
         emitCount()
+        emitArtworkChanged(id)
         if (id == FAVORITE_PLAYLIST) {
             _favorites.update {
                 songIds
@@ -227,8 +233,9 @@ class PlaylistRepository(private val symphony: Symphony) {
             cache[updated.id] = updated
             emitUpdateId()
             symphony.database.playlists.update(updated)
+            emitArtworkChanged(updated.id)
             if (previous != null && previous != name) {
-                CustomCovers.delete(symphony, previous)
+                CustomCovers.deleteAfterGracePeriod(symphony, previous)
             }
             withContext(Dispatchers.Main) { onResult(true) }
         }
@@ -242,9 +249,10 @@ class PlaylistRepository(private val symphony: Symphony) {
         val updated = current.copy(customCoverPath = null)
         cache[updated.id] = updated
         emitUpdateId()
+        emitArtworkChanged(updated.id)
         symphony.groove.coroutineScope.launch {
             symphony.database.playlists.update(updated)
-            CustomCovers.delete(symphony, previous)
+            CustomCovers.deleteAfterGracePeriod(symphony, previous)
         }
     }
 

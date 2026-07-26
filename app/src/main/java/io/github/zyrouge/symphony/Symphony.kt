@@ -1,7 +1,6 @@
 package io.github.zyrouge.symphony
 
 import android.app.Application
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,6 +14,7 @@ import io.github.zyrouge.symphony.services.groove.Groove
 import io.github.zyrouge.symphony.services.i18n.Translator
 import io.github.zyrouge.symphony.services.radio.Radio
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -36,11 +36,15 @@ class Symphony(application: Application) : AndroidViewModel(application), Sympho
 
     var t by mutableStateOf(translator.getCurrentTranslation())
 
+    var updateNotification by mutableStateOf<AppMeta.Release?>(null)
+        private set
+
     val applicationContext get() = getApplication<Application>().applicationContext
     var closeApp: (() -> Unit)? = null
     @Volatile
     private var isReady = false
     private var hooks = listOf(this, radio, groove)
+    private var updateCheckJob: Job? = null
 
     internal fun emitReady() {
         if (isReady) {
@@ -77,7 +81,7 @@ class Symphony(application: Application) : AndroidViewModel(application), Sympho
     }
 
     override fun onSymphonyReady() {
-        checkVersion()
+        checkForUpdates()
         viewModelScope.launch {
             translator.onChange { nTranslation ->
                 t = nTranslation
@@ -94,26 +98,31 @@ class Symphony(application: Application) : AndroidViewModel(application), Sympho
         hooks.forEach { fn.invoke(it) }
     }
 
-    private fun checkVersion() {
-        if (!settings.checkForUpdates.value) {
+    fun checkForUpdates() {
+        if (
+            !settings.checkForUpdates.value ||
+            !AppMeta.canCheckForUpdates ||
+            updateCheckJob?.isActive == true
+        ) {
             return
         }
-        viewModelScope.launch {
-            val latestVersion = withContext(Dispatchers.IO) {
+        updateCheckJob = viewModelScope.launch {
+            val release = withContext(Dispatchers.IO) {
                 AppMeta.fetchLatestVersion()
             }
-            if (latestVersion == null) {
-                return@launch
+            if (
+                release != null &&
+                settings.checkForUpdates.value &&
+                settings.showUpdateToast.value
+            ) {
+                updateNotification = release
             }
-            withContext(Dispatchers.Main) {
-                if (settings.showUpdateToast.value && AppMeta.version != latestVersion) {
-                    Toast.makeText(
-                        applicationContext,
-                        t.NewVersionAvailableX(latestVersion),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            }
+        }
+    }
+
+    fun consumeUpdateNotification(release: AppMeta.Release) {
+        if (updateNotification == release) {
+            updateNotification = null
         }
     }
 }

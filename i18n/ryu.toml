@@ -2,16 +2,6 @@ locale = "ryu"
 
 [keys]
 UnknownSymbol = "？"
-HelloThere = "はいさい！"
-IntroductoryMessage = """
-MAZIKAオープンベータぐりよういただきにふぇーでーびる。バグぬはっせいさーあい、あらんでぃかいじんていあんさるいばあえー、Githubリポジトリっしissueふぃらちくぃみそーれー。
-
-DiscordうゆびRedditコミュニティなさんがしフィードバックちゅーゆーいんし、さいしんじょうほうをんかいゅうしゅしください。
-
-MAZIKAー、Github Sponsors、Ko-fi、Patreonけいゆでいどぅちふにゆってぃサポートさりとーいびーん。
-
-あらたみてぃ、MAZIKAうたみしいただきにふぇーでーびる。
-"""
 Songs = "きょく"
 Artists = "アーティスト"
 Albums = "アルバム"
@@ -198,7 +188,6 @@ RenamePlaylist = "プレイリストぬやーめーへいるかん"
 Rename = "やーめーへいるかん"
 Equalizer = "イコライザー"
 LaunchingEqualizerFailedX = "イコライザーぬきどうんかいしっぺーさびたん（エラー： {x}）"
-ConsiderContributing = "こうきんきーるとうしみそーれー！"
 Lyrics = "かし"
 LyricsLayout = "かしぬレイアウト"
 ReplaceArtwork = "アートワークぬうきけーい"

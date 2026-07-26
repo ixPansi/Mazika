@@ -1,6 +1,7 @@
 package io.github.zyrouge.symphony.utils
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -28,5 +29,22 @@ class CustomCoversTest {
         assertEquals("a_b_c", CustomCovers.sanitizeId("a/b:c"))
         assertEquals("favorites", CustomCovers.sanitizeId("favorites"))
         assertEquals("1690000000000", CustomCovers.sanitizeId("1690000000000"))
+    }
+
+    @Test
+    fun retiredCover_isKeptUntilGracePeriodEnds() {
+        val now = 1_000_000L
+        assertFalse(
+            CustomCovers.isPastDeletionGracePeriod(
+                now - CustomCovers.RETIRED_COVER_GRACE_MS + 1L,
+                now,
+            )
+        )
+        assertTrue(
+            CustomCovers.isPastDeletionGracePeriod(
+                now - CustomCovers.RETIRED_COVER_GRACE_MS,
+                now,
+            )
+        )
     }
 }

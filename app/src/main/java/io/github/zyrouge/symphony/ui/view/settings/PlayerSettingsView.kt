@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.ui.components.settings.ConsiderContributingTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSideHeading
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSliderTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSwitchTile
@@ -92,7 +91,6 @@ fun PlayerSettingsView(context: ViewContext) {
                 Column(modifier = Modifier.verticalScroll(scrollState)) {
                     val seekDurationRange = 3f..60f
 
-                    ConsiderContributingTile(context)
                     SettingsSideHeading(context.symphony.t.Player)
                     SettingsSwitchTile(
                         icon = {

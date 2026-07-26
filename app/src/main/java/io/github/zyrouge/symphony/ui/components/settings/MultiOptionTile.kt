@@ -44,10 +44,10 @@ fun <T> SettingsMultiOptionTile(
     icon: @Composable () -> Unit,
     title: @Composable () -> Unit,
     note: (@Composable () -> Unit)? = null,
-    value: Set<T>,
+    value: List<T>,
     values: Map<T, String>,
-    satisfies: (Set<T>) -> Boolean = { true },
-    onChange: (Set<T>) -> Unit,
+    satisfies: (List<T>) -> Boolean = { true },
+    onChange: (List<T>) -> Unit,
 ) {
     var isOpen by remember { mutableStateOf(false) }
 
@@ -76,10 +76,10 @@ fun <T> SettingsMultiOptionTile(
             }
         }
         val satisfied by remember(nValue) {
-            derivedStateOf { satisfies(nValue.toSet()) }
+            derivedStateOf { satisfies(nValue) }
         }
         val modified by remember(nValue, value) {
-            derivedStateOf { nValue.toSet() != value }
+            derivedStateOf { orderedSelectionChanged(nValue, value) }
         }
 
         ScaffoldDialog(
@@ -175,7 +175,7 @@ fun <T> SettingsMultiOptionTile(
                 TextButton(
                     enabled = modified && satisfied,
                     onClick = {
-                        onChange(nValue.toSet())
+                        onChange(nValue.toList())
                         isOpen = false
                     }
                 ) {
@@ -185,3 +185,6 @@ fun <T> SettingsMultiOptionTile(
         )
     }
 }
+
+internal fun <T> orderedSelectionChanged(selection: List<T>, original: List<T>): Boolean =
+    selection != original

@@ -2,16 +2,6 @@ locale = "ro"
 
 [keys]
 UnknownSymbol = "?"
-HelloThere = "Salut!"
-IntroductoryMessage = """
-Mulțumim că faci parte din open-beta-ul aplicației MAZIKA. Dacă întâmpini bug-uri sau vrei să sugerezi îmbunătățiri, te rugăm să deschizi un issue pe Github.
-
-Alătură-te comunității noastre de Discord și Reddit pentru a-ți împărtăși ideile și pentru a fi la curent cu dezvoltarea aplicației.
-
-Aplicația MAZIKA este gratuită, fiind susținută în întregime prin donați făcute prin Github Sponsors, Ko-fi și Patreon.
-
-Din nou, mulțumim pentru că ai încercat MAZIKA!
-"""
 Songs = "Piese"
 Artists = "Artiști"
 Albums = "Albume"
@@ -198,7 +188,6 @@ RenamePlaylist = "Redenumește playlistul"
 Rename = "Redenumește"
 Equalizer = "Egalizator"
 LaunchingEqualizerFailedX = "Lansarea egalizatorului a eșuat! (Eroare: {x})"
-ConsiderContributing = "Contribuie la dezvoltarea aplicației!"
 Lyrics = "Versuri"
 LyricsLayout = "Așezarea versurilor"
 ReplaceArtwork = "Înlocuiește coperta"

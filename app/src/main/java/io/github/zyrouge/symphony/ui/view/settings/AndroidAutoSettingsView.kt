@@ -2,19 +2,14 @@ package io.github.zyrouge.symphony.ui.view.settings
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -26,20 +21,17 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.zyrouge.symphony.services.radio.AndroidAutoCategory
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
+import io.github.zyrouge.symphony.ui.components.ReorderableContainer
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
+import io.github.zyrouge.symphony.ui.components.movedItem
 import io.github.zyrouge.symphony.ui.components.rememberReorderableState
-import io.github.zyrouge.symphony.ui.components.reorderableHandle
 import io.github.zyrouge.symphony.ui.components.reorderableItemModifier
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSideHeading
 import io.github.zyrouge.symphony.ui.helpers.ViewContext
@@ -68,29 +60,41 @@ fun AndroidAutoSettingsView(context: ViewContext) {
     val enabled by context.symphony.settings.androidAutoCategories.flow.collectAsState()
     val listState = rememberLazyListState()
 
-    // Local copy so dragging stays smooth; persisted once on release.
-    val order = remember { mutableStateListOf<AndroidAutoCategory>() }
-    LaunchedEffect(enabled) {
-        order.clear()
-        order.addAll(enabled)
-    }
-    val disabled = AndroidAutoCategory.entries.filter { it !in order }
+    val disabled = AndroidAutoCategory.entries.filter { it !in enabled }
 
-    val persist = {
-        context.symphony.settings.androidAutoCategories.setValue(order.toList())
+    val persist: (List<AndroidAutoCategory>) -> Unit = {
+        context.symphony.settings.androidAutoCategories.setValue(it)
     }
+    val enabledKeys = enabled.map(::enabledRowKey)
     val reorderState = rememberReorderableState(
         listState = listState,
-        itemCount = { order.size },
+        itemKeys = { enabledKeys },
         // The list emits a heading item before the rows, so data index 0 is lazy index 1.
         firstItemIndex = { 1 },
+        sourceVersion = { enabled },
         onMove = { from, to ->
-            if (from in order.indices && to in order.indices) {
-                order.add(to, order.removeAt(from))
+            if (from in enabled.indices && to in enabled.indices) {
+                persist(enabled.movedItem(from, to))
             }
         },
-        onSettle = { persist() },
     )
+
+    val enabledRow: @Composable (Int) -> Unit = { index ->
+        enabled.getOrNull(index)?.let { category ->
+            CategoryRow(
+                label = category.label(context.symphony),
+                checked = true,
+                // Never let the last category be switched off - an empty root screen
+                // would look like a broken app in the car.
+                canDisable = enabled.size > 1,
+                onCheckedChange = {
+                    if (enabled.size > 1) {
+                        persist(enabled.filterNot { it == category })
+                    }
+                },
+            )
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -118,67 +122,56 @@ fun AndroidAutoSettingsView(context: ViewContext) {
                     .padding(contentPadding)
                     .fillMaxSize()
             ) {
-                LazyColumn(state = listState) {
-                    item {
-                        Column {
-                            SettingsSideHeading(context.symphony.t.AndroidAutoCategories)
-                            Text(
-                                context.symphony.t.AndroidAutoCategoriesHint,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(20.dp, 0.dp, 20.dp, 8.dp),
-                            )
-                        }
-                    }
-                    itemsIndexed(
-                        order,
-                        key = { _, x -> enabledRowKey(x) },
-                    ) { _, category ->
-                        val rowKey = enabledRowKey(category)
-                        Box(modifier = reorderableItemModifier(reorderState, rowKey)) {
-                            CategoryRow(
-                                label = category.label(context.symphony),
-                                checked = true,
-                                // Never let the last category be switched off - an empty
-                                // root screen would look like a broken app in the car.
-                                canDisable = order.size > 1,
-                                dragHandle = {
-                                    Icon(
-                                        Icons.Filled.DragIndicator,
-                                        context.symphony.t.Reorder,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .reorderableHandle(reorderState, rowKey),
-                                    )
-                                },
-                                onCheckedChange = {
-                                    if (order.size > 1) {
-                                        order.remove(category)
-                                        persist()
-                                    }
-                                },
-                            )
-                        }
-                    }
-                    if (disabled.isNotEmpty()) {
+                ReorderableContainer(
+                    state = reorderState,
+                    modifier = Modifier.fillMaxSize(),
+                    draggedItem = enabledRow,
+                ) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
                         item {
-                            SettingsSideHeading(context.symphony.t.Disabled)
+                            Column {
+                                SettingsSideHeading(context.symphony.t.AndroidAutoCategories)
+                                Text(
+                                    context.symphony.t.AndroidAutoCategoriesHint,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(20.dp, 0.dp, 20.dp, 8.dp),
+                                )
+                            }
                         }
-                        items@ itemsIndexed(
-                            disabled,
-                            key = { _, x -> "disabled-${x.name}" },
-                        ) { _, category ->
-                            CategoryRow(
-                                label = category.label(context.symphony),
-                                checked = false,
-                                canDisable = true,
-                                dragHandle = { Spacer(modifier = Modifier.width(20.dp)) },
-                                onCheckedChange = {
-                                    order.add(category)
-                                    persist()
-                                },
-                            )
+                        itemsIndexed(
+                            enabled,
+                            key = { _, category -> enabledRowKey(category) },
+                        ) { index, category ->
+                            Box(
+                                modifier = reorderableItemModifier(
+                                    reorderState,
+                                    enabledRowKey(category),
+                                )
+                            ) {
+                                enabledRow(index)
+                            }
+                        }
+                        if (disabled.isNotEmpty()) {
+                            item {
+                                SettingsSideHeading(context.symphony.t.Disabled)
+                            }
+                            items@ itemsIndexed(
+                                disabled,
+                                key = { _, category -> "disabled-${category.name}" },
+                            ) { _, category ->
+                                CategoryRow(
+                                    label = category.label(context.symphony),
+                                    checked = false,
+                                    canDisable = true,
+                                    onCheckedChange = {
+                                        persist(enabled + category)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -192,13 +185,9 @@ private fun CategoryRow(
     label: String,
     checked: Boolean,
     canDisable: Boolean,
-    dragHandle: @Composable () -> Unit,
     onCheckedChange: () -> Unit,
 ) {
     ListItem(
-        leadingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) { dragHandle() }
-        },
         headlineContent = { Text(label) },
         trailingContent = {
             Switch(

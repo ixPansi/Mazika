@@ -31,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import io.github.zyrouge.symphony.services.i18n.CommonTranslation
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholder
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
-import io.github.zyrouge.symphony.ui.components.settings.ConsiderContributingTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsFloatInputTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsOptionTile
 import io.github.zyrouge.symphony.ui.components.settings.SettingsSideHeading
@@ -100,7 +99,6 @@ fun AppearanceSettingsView(context: ViewContext) {
                     .fillMaxSize()
             ) {
                 Column(modifier = Modifier.verticalScroll(scrollState)) {
-                    ConsiderContributingTile(context)
                     SettingsSideHeading(context.symphony.t.Appearance)
                     SettingsOptionTile(
                         icon = {
@@ -293,7 +291,7 @@ private fun syncPresetToSelection(
 // Preset and brand-colour names are product names, so they stay untranslated —
 // only "Custom" comes from the translations.
 fun ThemePreset.label(context: ViewContext) = when (this) {
-    ThemePreset.MazikaRed -> "MAZIKA Red"
+    ThemePreset.MazikaRed -> "Dark Red"
     ThemePreset.Midnight -> "Midnight"
     ThemePreset.Forest -> "Forest"
     ThemePreset.Ocean -> "Ocean"
@@ -303,7 +301,7 @@ fun ThemePreset.label(context: ViewContext) = when (this) {
 }
 
 fun PrimaryThemeColor.label(context: ViewContext) = when (this) {
-    PrimaryThemeColor.MazikaRed -> "MAZIKA Red"
+    PrimaryThemeColor.MazikaRed -> "Dark Red"
     PrimaryThemeColor.Red -> context.symphony.t.Red
     PrimaryThemeColor.Orange -> context.symphony.t.Orange
     PrimaryThemeColor.Amber -> context.symphony.t.Amber

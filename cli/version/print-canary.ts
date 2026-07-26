@@ -9,7 +9,7 @@ const main = async () => {
         year: time.getFullYear(),
         month: time.getMonth() + 1,
         code: pVersion.code + 1,
-        prerelease: "nightly",
+        prerelease: "canary",
         build: sha,
     });
     console.log(version.toString());

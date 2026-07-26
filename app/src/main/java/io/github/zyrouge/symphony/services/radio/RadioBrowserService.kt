@@ -1,16 +1,18 @@
 package io.github.zyrouge.symphony.services.radio
 
-import android.content.Intent
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import androidx.media.MediaBrowserServiceCompat
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.SymphonyProvider
+import io.github.zyrouge.symphony.utils.EventUnsubscribeFn
 import io.github.zyrouge.symphony.utils.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * MAZIKA: media browser service that lets Android Auto browse and play the local
@@ -21,7 +23,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 class RadioBrowserService : MediaBrowserServiceCompat() {
     private lateinit var symphony: Symphony
     private lateinit var browser: RadioBrowser
-    private var clientPackageName: String? = null
+    private var artworkChangeUnsubscribe: EventUnsubscribeFn? = null
+    private val delayedReadinessParents = ConcurrentHashMap.newKeySet<String>()
+    private val readinessRefreshScheduled = AtomicBoolean()
+    @Volatile
+    private var destroyed = false
 
     override fun onCreate() {
         super.onCreate()
@@ -36,6 +42,12 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
             symphony = SymphonyProvider.get(application)
             browser = RadioBrowser(symphony)
             sessionToken = symphony.radio.session.mediaSession.sessionToken
+            artworkChangeUnsubscribe = symphony.radio.session.onBrowseChildrenChanged
+                .subscribe { parentIds ->
+                    symphony.groove.coroutineScope.launch(Dispatchers.Main) {
+                        if (!destroyed) notifyBrowseParents(parentIds)
+                    }
+                }
         } catch (err: Throwable) {
             Logger.error("RadioBrowserService", "initialisation failed", err)
             stopSelf()
@@ -56,10 +68,9 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         clientUid: Int,
         rootHints: Bundle?,
     ): BrowserRoot {
-        this.clientPackageName = clientPackageName
-        // Queue artwork is published through the media session rather than through this
-        // service, so RadioSession needs to know who to grant read access to.
-        symphony.radio.session.browserClientPackage = clientPackageName
+        // Prefix access is granted immediately, including for queue URIs that were
+        // published before this browser connected.
+        symphony.radio.session.registerBrowserClient(clientPackageName)
         return BrowserRoot(MediaId.ROOT, null)
     }
 
@@ -68,7 +79,10 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         ensureReady()
         symphony.groove.coroutineScope.launch {
             val items = try {
-                withTimeoutOrNull(LIBRARY_WAIT_MS) { symphony.groove.readyDeferred.await() }
+                val ready = withTimeoutOrNull(LIBRARY_WAIT_MS) {
+                    symphony.groove.readyDeferred.await()
+                } == true
+                if (!ready) scheduleReadinessRefresh(parentId)
                 browser.getChildren(parentId)
             } catch (err: Exception) {
                 Logger.error("RadioBrowserService", "onLoadChildren failed for $parentId", err)
@@ -80,7 +94,6 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
             // can never escape into the shared coroutine scope.
             withContext(Dispatchers.Main) {
                 try {
-                    grantIconPermissions(items)
                     result.sendResult(items.toMutableList())
                 } catch (err: Exception) {
                     Logger.error("RadioBrowserService", "sending children failed", err)
@@ -98,7 +111,10 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         ensureReady()
         symphony.groove.coroutineScope.launch {
             val items = try {
-                withTimeoutOrNull(LIBRARY_WAIT_MS) { symphony.groove.readyDeferred.await() }
+                val ready = withTimeoutOrNull(LIBRARY_WAIT_MS) {
+                    symphony.groove.readyDeferred.await()
+                } == true
+                if (!ready) scheduleReadinessRefresh()
                 browser.search(query)
             } catch (err: Exception) {
                 Logger.error("RadioBrowserService", "onSearch failed for '$query'", err)
@@ -106,7 +122,6 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
             }
             withContext(Dispatchers.Main) {
                 try {
-                    grantIconPermissions(items)
                     result.sendResult(items.toMutableList())
                 } catch (err: Exception) {
                     Logger.error("RadioBrowserService", "sending search results failed", err)
@@ -115,20 +130,45 @@ class RadioBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    // Grant the connecting browser client (e.g. Android Auto) read access to the
-    // artwork content URIs referenced by the returned items.
-    private fun grantIconPermissions(items: List<MediaItem>) {
-        val client = clientPackageName ?: return
-        val authority = ArtworkProvider.authority(this)
-        items.forEach { item ->
-            val uri = item.description.iconUri ?: return@forEach
-            if (uri.scheme == "content" && uri.authority == authority) {
-                try {
-                    grantUriPermission(client, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (_: Exception) {
+    private fun scheduleReadinessRefresh(parentId: String? = null) {
+        parentId?.let(delayedReadinessParents::add)
+        if (!readinessRefreshScheduled.compareAndSet(false, true)) return
+        symphony.groove.coroutineScope.launch {
+            try {
+                symphony.groove.readyDeferred.await()
+                withContext(Dispatchers.Main) {
+                    if (destroyed) return@withContext
+                    notifyBrowseParents(
+                        buildSet {
+                            add(MediaId.ROOT)
+                            addAll(AndroidAutoCategory.entries.map { it.mediaId })
+                            addAll(delayedReadinessParents)
+                        }
+                    )
                 }
+            } catch (err: Exception) {
+                Logger.warn("RadioBrowserService", "delayed readiness refresh failed: $err")
             }
         }
+    }
+
+    private fun notifyBrowseParents(parentIds: Set<String>) {
+        parentIds.forEach { parentId ->
+            runCatching { notifyChildrenChanged(parentId) }
+                .onFailure {
+                    Logger.warn(
+                        "RadioBrowserService",
+                        "unable to notify children changed for $parentId: $it",
+                    )
+                }
+        }
+    }
+
+    override fun onDestroy() {
+        destroyed = true
+        artworkChangeUnsubscribe?.invoke()
+        artworkChangeUnsubscribe = null
+        super.onDestroy()
     }
 
     companion object {

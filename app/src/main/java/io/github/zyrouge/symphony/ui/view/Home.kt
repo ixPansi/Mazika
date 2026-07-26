@@ -74,7 +74,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.zyrouge.symphony.services.groove.Groove
-import io.github.zyrouge.symphony.ui.components.IntroductoryDialog
 import io.github.zyrouge.symphony.ui.components.NowPlayingBottomBar
 import io.github.zyrouge.symphony.ui.components.TopAppBarMinimalTitle
 import io.github.zyrouge.symphony.ui.components.swipeable
@@ -170,7 +169,6 @@ object HomeViewRoute
 @Composable
 fun HomeView(context: ViewContext) {
     val coroutineScope = rememberCoroutineScope()
-    val readIntroductoryMessage by context.symphony.settings.readIntroductoryMessage.flow.collectAsState()
     val tabs by context.symphony.settings.homeTabs.flow.collectAsState()
     val labelVisibility by context.symphony.settings.homePageBottomBarLabelVisibility.flow.collectAsState()
     val currentTab by context.symphony.settings.lastHomeTab.flow.collectAsState()
@@ -407,14 +405,5 @@ fun HomeView(context: ViewContext) {
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
-    }
-
-    if (!readIntroductoryMessage) {
-        IntroductoryDialog(
-            context,
-            onDismissRequest = {
-                context.symphony.settings.readIntroductoryMessage.setValue(true)
-            },
-        )
     }
 }

@@ -1,13 +1,14 @@
 package io.github.zyrouge.symphony.ui.view
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -37,12 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.zyrouge.symphony.services.groove.Groove
+import io.github.zyrouge.symphony.services.radio.indexAfterMove
 import io.github.zyrouge.symphony.ui.components.IconButtonPlaceholderSize
 import io.github.zyrouge.symphony.ui.components.NewPlaylistDialog
-import androidx.compose.material.icons.filled.DragIndicator
-import androidx.compose.runtime.LaunchedEffect
+import io.github.zyrouge.symphony.ui.components.ReorderableContainer
 import io.github.zyrouge.symphony.ui.components.rememberReorderableState
-import io.github.zyrouge.symphony.ui.components.reorderableHandle
 import io.github.zyrouge.symphony.ui.components.reorderableItemModifier
 import io.github.zyrouge.symphony.ui.components.ReorderableEntry
 import io.github.zyrouge.symphony.ui.components.toReorderableEntries
@@ -56,7 +56,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 object QueueViewRoute
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun QueueView(context: ViewContext) {
     val coroutineScope = rememberCoroutineScope()
@@ -68,36 +68,70 @@ fun QueueView(context: ViewContext) {
     )
     var showSaveDialog by remember { mutableStateOf(false) }
 
-    // MAZIKA: drag-to-reorder. The list is reordered in this local copy while the
-    // finger is down so dragging stays smooth, and the queue is only rewritten once
-    // on release - reordering never restarts or changes the playing song.
-    val reorderableQueue = remember { mutableStateListOf<ReorderableEntry<String>>() }
-    LaunchedEffect(queue) {
-        reorderableQueue.clear()
-        reorderableQueue.addAll(queue.toReorderableEntries())
-    }
-    // Only one item moves during a drag; everything else just shifts. So the whole
-    // gesture collapses to a single move from where it started to where it ended,
-    // which is what gets applied to the real queue on release.
-    var pendingMove by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // The queue stays authoritative during a drag. Release submits one guarded move;
+    // a concurrent queue replacement makes moveIfUnchanged reject stale indices.
+    val queueEntries = queue.toReorderableEntries()
+    val queueKeys = queueEntries.map { it.uid }
     val reorderState = rememberReorderableState(
         listState = listState,
-        itemCount = { reorderableQueue.size },
+        itemKeys = { queueKeys },
+        sourceVersion = { queue },
         onMove = { from, to ->
-            if (from in reorderableQueue.indices && to in reorderableQueue.indices) {
-                reorderableQueue.add(to, reorderableQueue.removeAt(from))
-                pendingMove = (pendingMove?.first ?: from) to to
-            }
-        },
-        onSettle = {
-            pendingMove?.let { (from, to) ->
-                if (from != to) {
-                    context.symphony.radio.queue.move(from, to)
+            if (from in queueEntries.indices && to in queueEntries.indices) {
+                if (context.symphony.radio.queue.moveIfUnchanged(queue, from, to)) {
+                    val movedSelection = selectedSongIndices.map {
+                        indexAfterMove(it, from, to)
+                    }
+                    selectedSongIndices.clear()
+                    selectedSongIndices.addAll(movedSelection)
                 }
             }
-            pendingMove = null
         },
     )
+
+    val rowContent: @Composable (Int, ReorderableEntry<String>) -> Unit = { i, entry ->
+        context.symphony.groove.song.get(entry.value)?.let { song ->
+            Box {
+                SongCard(
+                    context,
+                    song,
+                    autoHighlight = false,
+                    highlighted = i == queueIndex,
+                    leading = {
+                        Checkbox(
+                            checked = selectedSongIndices.contains(i),
+                            onCheckedChange = {
+                                if (selectedSongIndices.contains(i)) {
+                                    selectedSongIndices.remove(i)
+                                } else {
+                                    selectedSongIndices.add(i)
+                                }
+                            },
+                            modifier = Modifier.offset((-4).dp)
+                        )
+                    },
+                    thumbnailLabel = {
+                        Text((i + 1).toString())
+                    },
+                    onClick = {
+                        context.symphony.radio.jumpTo(i)
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(i)
+                        }
+                    },
+                )
+                if (i < queueIndex) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.3f)
+                            )
+                    )
+                }
+            }
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -163,65 +197,38 @@ fun QueueView(context: ViewContext) {
                     .padding(contentPadding)
                     .fillMaxSize()
             ) {
-                if (queue.isEmpty()) {
+                if (queueEntries.isEmpty()) {
                     NothingPlayingBody(context)
                 } else {
-                    LazyColumn(state = listState) {
-                        itemsIndexed(
-                            reorderableQueue,
-                            key = { _, entry -> entry.uid },
-                            contentType = { _, _ -> Groove.Kind.SONG },
-                        ) { i, entry ->
-                            context.symphony.groove.song.get(entry.value)?.let { song ->
-                                Box(modifier = reorderableItemModifier(reorderState, entry.uid)) {
-                                    SongCard(
-                                        context,
-                                        song,
-                                        autoHighlight = false,
-                                        highlighted = i == queueIndex,
-                                        leading = {
-                                            Checkbox(
-                                                checked = selectedSongIndices.contains(i),
-                                                onCheckedChange = {
-                                                    if (selectedSongIndices.contains(i)) {
-                                                        selectedSongIndices.remove(i)
-                                                    } else {
-                                                        selectedSongIndices.add(i)
-                                                    }
-                                                },
-                                                modifier = Modifier.offset((-4).dp)
+                    ReorderableContainer(
+                        state = reorderState,
+                        modifier = Modifier.fillMaxSize(),
+                        draggedItem = { index ->
+                            queueEntries.getOrNull(index)?.let {
+                                rowContent(index, it)
+                            }
+                        },
+                    ) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            itemsIndexed(
+                                queueEntries,
+                                key = { _, entry -> entry.uid },
+                                contentType = { _, _ -> Groove.Kind.SONG },
+                            ) { i, entry ->
+                                Box(
+                                    modifier = Modifier
+                                        .animateItem(
+                                            placementSpec = spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMediumLow,
                                             )
-                                            // Drag handle: press and drag to reorder.
-                                            // A dedicated handle keeps tap-to-play working.
-                                            Icon(
-                                                Icons.Filled.DragIndicator,
-                                                context.symphony.t.Reorder,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .reorderableHandle(reorderState, entry.uid),
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        },
-                                        thumbnailLabel = {
-                                            Text((i + 1).toString())
-                                        },
-                                        onClick = {
-                                            context.symphony.radio.jumpTo(i)
-                                            coroutineScope.launch {
-                                                listState.animateScrollToItem(i)
-                                            }
-                                        },
-                                    )
-                                    if (i < queueIndex) {
-                                        Box(
-                                            modifier = Modifier
-                                                .matchParentSize()
-                                                .background(
-                                                    MaterialTheme.colorScheme.background.copy(alpha = 0.3f)
-                                                )
                                         )
-                                    }
+                                        .then(reorderableItemModifier(reorderState, entry.uid))
+                                ) {
+                                    rowContent(i, entry)
                                 }
                             }
                         }

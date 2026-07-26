@@ -2,7 +2,7 @@
 
 Automated unit tests cover the pure decision logic (`./gradlew testDebugUnitTest`).
 The cases below are the manual/device checks for behaviour that needs the UI, audio
-hardware or Android Auto. Install `artifacts/MAZIKA-debug.apk` and grant the
+hardware or Android Auto. Install `app/build/outputs/apk/debug/app-universal-debug.apk` and grant the
 music-library permission first.
 
 ## Phone playback (regression)
@@ -24,7 +24,7 @@ music-library permission first.
       immediate, but starting a new track still fades in.
 - [ ] With both ON: pause fades out and resume fades in.
 - [ ] Toggling the master option off then on restores the dependent option's stored
-      value (defaults to on for upgrades).
+      value (fresh installs default to off).
 - [ ] Sleep-timer fade-out still happens regardless of the settings.
 - [ ] The behaviour is the same from the player, mini-player, notification, lock
       screen, headset, Bluetooth and Android Auto.
@@ -53,7 +53,8 @@ music-library permission first.
 
 ## Android Auto (Desktop Head Unit / real car / Media Controller Test)
 - [ ] MAZIKA appears in the Android Auto media apps list.
-- [ ] Root shows Songs / Albums / Artists / Playlists / Genres / Folders.
+- [ ] Root defaults to Playlists / Songs / Artists / Genres / Albums; Folders is
+      disabled until enabled in Settings -> Android Auto.
 - [ ] Each category browses; opening an album/artist/playlist/folder lists songs.
 - [ ] Playing a song from an album/playlist builds the correct queue.
 - [ ] Custom playlist covers and artwork appear.

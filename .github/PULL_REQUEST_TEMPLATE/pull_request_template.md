@@ -9,8 +9,3 @@ Fixes #issue_number.
 -   [ ] Bug fix (non-breaking change which fixes an issue)
 -   [ ] New feature (non-breaking change which adds functionality)
 -   [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-
-### Checklist
-
-<!-- change [ ] to [x] to mark the checkbox -->
--   [ ] I have read the [Contribution Guidelines](https://github.com/zyrouge/symphony/wiki/Contributions-Guidelines#pull-requests).

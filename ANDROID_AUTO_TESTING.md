@@ -30,13 +30,14 @@ media browser service and lets you walk the browse tree and fire transport contr
 
 2. Install MAZIKA and grant it storage/media permission so the library is not empty:
    ```bash
-   adb install -r artifacts/MAZIKA.apk
+   adb install -r app/build/outputs/apk/release/app-universal-release.apk
    ```
 
 3. Open **Media Controller Test** → pick **MAZIKA** from the list of media apps.
 
 4. What to verify:
-   - The root shows **Songs / Albums / Artists / Playlists / Genres / Folders**.
+   - The root defaults to **Playlists / Songs / Artists / Genres / Albums**;
+     **Folders** appears after enabling it in Settings -> Android Auto.
    - Each category opens and lists items; albums/artists/playlists open to their songs.
    - Tapping a song starts playback and the **phone's notification updates too**
      (proves the shared session/queue).
@@ -130,7 +131,7 @@ In Android Studio: **Device Manager → Create Device → Automotive** → pick 
 "Automotive with Play Store" system image. Launch it and install MAZIKA:
 
 ```bash
-adb install -r artifacts/MAZIKA.apk
+adb install -r app/build/outputs/apk/release/app-universal-release.apk
 ```
 
 Note MAZIKA targets phone Android Auto; it declares `<uses name="media"/>` in
@@ -164,7 +165,7 @@ adb logcat | grep -iE "RadioBrowser|MAZIKALogger"
      that metadata as a resource id, so it could not resolve the descriptor and never
      registered MAZIKA as a media app. Verify your APK:
      ```bash
-     aapt2 dump xmltree --file AndroidManifest.xml artifacts/MAZIKA.apk | grep -A2 car.application
+     aapt2 dump xmltree --file AndroidManifest.xml app/build/outputs/apk/release/app-universal-release.apk | grep -A2 car.application
      ```
      You must see `android:resource(0x01010025)=@0x...`, **not** `android:value`.
   2. **Enable *Unknown sources*** in Android Auto -> Developer settings. Sideloaded

@@ -197,7 +197,11 @@ class SongRepository(private val symphony: Symphony) {
             val previous = customCovers.put(song.path, name)
             symphony.database.songCovers.upsert(SongCover(song.path, name))
             if (previous != null && previous != name) {
-                CustomCovers.delete(symphony, previous, CustomCovers.SONG_DIRECTORY)
+                CustomCovers.deleteAfterGracePeriod(
+                    symphony,
+                    previous,
+                    CustomCovers.SONG_DIRECTORY,
+                )
             }
             emitIds()
             onArtworkChanged(song.id)
@@ -213,7 +217,11 @@ class SongRepository(private val symphony: Symphony) {
         onArtworkChanged(song.id)
         symphony.groove.coroutineScope.launch {
             symphony.database.songCovers.delete(song.path)
-            CustomCovers.delete(symphony, previous, CustomCovers.SONG_DIRECTORY)
+            CustomCovers.deleteAfterGracePeriod(
+                symphony,
+                previous,
+                CustomCovers.SONG_DIRECTORY,
+            )
         }
     }
 

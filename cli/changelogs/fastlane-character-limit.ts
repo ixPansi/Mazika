@@ -9,6 +9,11 @@ const start = async () => {
     const dirnames = await fs.readdir(Paths.metadataDir);
     for (const x of dirnames) {
         const dir = p.join(Paths.metadataDir, x, "changelogs");
+        // Not every locale ships changelogs (ru-RU has none), and readdirSync
+        // throws ENOENT rather than returning empty.
+        if (!fs.existsSync(dir)) {
+            continue;
+        }
         for (const name of fs.readdirSync(dir)) {
             const path = p.join(dir, name);
             const content = await fs.readFile(path, "utf-8");

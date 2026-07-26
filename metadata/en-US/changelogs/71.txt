@@ -1,2 +1,0 @@
-- Fixed notification artwork being pixelated.
-- Initial F-droid release.
