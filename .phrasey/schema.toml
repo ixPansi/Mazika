@@ -803,6 +803,15 @@ name = "GaplessPlayback"
 name = "GridColumns"
 
 [[keys]]
+name = "Layout"
+
+[[keys]]
+name = "Grid"
+
+[[keys]]
+name = "List"
+
+[[keys]]
 name = "CaseSensitiveSorting"
 
 [[keys]]

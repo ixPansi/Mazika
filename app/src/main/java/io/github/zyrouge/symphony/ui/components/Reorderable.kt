@@ -72,6 +72,15 @@ internal fun <T> List<T>.toReorderableEntriesInOrder(
     }
 }
 
+/**
+ * Converts a displayed order back into the order to store.
+ *
+ * A reversed sort shows the stored order backwards, so what the user built on screen has to
+ * be flipped again before it is written, or the next read mirrors it.
+ */
+internal fun <T> List<T>.toStoredCustomOrder(reverse: Boolean): List<T> =
+    if (reverse) reversed() else toList()
+
 /** Returns one atomic remove-and-insert move without changing this list. */
 internal fun <T> List<T>.movedItem(from: Int, to: Int): List<T> {
     if (from !in indices || to !in indices || from == to) return toList()

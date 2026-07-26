@@ -1,5 +1,7 @@
 package io.github.zyrouge.symphony.ui.components
 
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
@@ -38,6 +40,7 @@ fun AlbumArtistGrid(
             ResponsiveGridColumns(horizontalGridColumns, verticalGridColumns)
         }
     }
+    val layout by context.symphony.settings.lastUsedAlbumArtistsLayout.flow.collectAsState()
     var showModifyLayoutSheet by remember { mutableStateOf(false) }
 
     MediaSortBarScaffold(
@@ -79,10 +82,23 @@ fun AlbumArtistGrid(
                     content = { Text(context.symphony.t.DamnThisIsSoEmpty) }
                 )
 
+                layout == MediaLayout.LIST -> LazyColumn {
+                    items(
+                        sortedAlbumArtistNames,
+                        key = { it },
+                        contentType = { Groove.Kind.ARTIST },
+                    ) { albumArtistName ->
+                        context.symphony.groove.albumArtist.get(albumArtistName)
+                            ?.let { albumArtist ->
+                                AlbumArtistListItem(context, albumArtist)
+                            }
+                    }
+                }
+
                 else -> ResponsiveGrid(gridColumns) {
                     itemsIndexed(
                         sortedAlbumArtistNames,
-                        key = { i, x -> "$i-$x" },
+                        key = { _, x -> x },
                         contentType = { _, _ -> Groove.Kind.ARTIST }
                     ) { _, albumArtistName ->
                         context.symphony.groove.albumArtist.get(albumArtistName)
@@ -94,8 +110,12 @@ fun AlbumArtistGrid(
             }
 
             if (showModifyLayoutSheet) {
-                ResponsiveGridSizeAdjustBottomSheet(
+                MediaLayoutAdjustDialog(
                     context,
+                    layout = layout,
+                    onLayoutChange = {
+                        context.symphony.settings.lastUsedAlbumArtistsLayout.setValue(it)
+                    },
                     columns = gridColumns,
                     onColumnsChange = {
                         context.symphony.settings.lastUsedAlbumArtistsHorizontalGridColumns.setValue(

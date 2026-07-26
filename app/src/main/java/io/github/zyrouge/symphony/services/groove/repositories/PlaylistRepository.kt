@@ -153,17 +153,26 @@ class PlaylistRepository(private val symphony: Symphony) {
     fun sort(playlistIds: List<String>, by: SortBy, reverse: Boolean): List<String> {
         val sensitive = symphony.settings.caseSensitiveSorting.value
         val sorted = when (by) {
-            SortBy.CUSTOM -> {
-                val prefix = listOfNotNull(FAVORITE_PLAYLIST)
-                val others = playlistIds.toMutableList()
-                prefix.forEach { others.remove(it) }
-                prefix + others
-            }
+            SortBy.CUSTOM -> applyCustomOrder(
+                playlistIds,
+                symphony.settings.playlistsCustomOrder.value,
+            )
 
             SortBy.TITLE -> playlistIds.sortedBy { get(it)?.title?.withCase(sensitive) }
             SortBy.TRACKS_COUNT -> playlistIds.sortedBy { get(it)?.numberOfTracks }
         }
         return if (reverse) sorted.reversed() else sorted
+    }
+
+    /**
+     * MAZIKA: stores the order the user dragged playlists into.
+     *
+     * Only meaningful under [SortBy.CUSTOM]; see [applyCustomOrder] for how a stored order
+     * survives playlists being created and deleted.
+     */
+    fun setCustomOrder(playlistIds: List<String>) {
+        symphony.settings.playlistsCustomOrder.setValue(playlistIds)
+        emitUpdateId()
     }
 
     fun count() = cache.size
@@ -358,5 +367,34 @@ class PlaylistRepository(private val symphony: Symphony) {
 
     companion object {
         private const val FAVORITE_PLAYLIST = "favorites"
+
+        /**
+         * MAZIKA: applies a user-defined order to the playlists that currently exist.
+         *
+         * The stored order is deliberately *partial*. Playlists are created and deleted
+         * between one read and the next, so it can neither be treated as the full list nor
+         * rewritten on every change:
+         *
+         * - ids missing from it still have to appear, and belong at the **end** - that is
+         *   where a newly created playlist should show up, not somewhere in the middle.
+         *   [sortedBy] is stable, so they keep their relative order rather than shuffling.
+         * - ids in it that no longer exist are simply never matched.
+         *
+         * With nothing stored this is the previous behaviour: Favorites first, everything
+         * else after it. Once an order exists Favorites is just another id in it, so it can
+         * be dragged anywhere like any other playlist.
+         */
+        internal fun applyCustomOrder(
+            playlistIds: List<String>,
+            storedOrder: List<String>,
+        ): List<String> {
+            if (storedOrder.isEmpty()) {
+                val prefix = playlistIds.filter { it == FAVORITE_PLAYLIST }
+                return prefix + playlistIds.filterNot { it == FAVORITE_PLAYLIST }
+            }
+            val ranks = HashMap<String, Int>(storedOrder.size)
+            storedOrder.forEachIndexed { index, id -> ranks.putIfAbsent(id, index) }
+            return playlistIds.sortedBy { ranks[it] ?: Int.MAX_VALUE }
+        }
     }
 }

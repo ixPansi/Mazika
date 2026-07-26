@@ -300,9 +300,6 @@ fun SongList(
     )
 }
 
-internal fun <T> List<T>.toStoredCustomOrder(reverse: Boolean): List<T> =
-    if (reverse) reversed() else toList()
-
 fun SongRepository.SortBy.label(context: ViewContext) = when (this) {
     SongRepository.SortBy.CUSTOM -> context.symphony.t.Custom
     SongRepository.SortBy.TITLE -> context.symphony.t.Title

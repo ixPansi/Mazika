@@ -1,0 +1,5 @@
+Put playlists in your own order, and browse as a list.
+
+* Sort playlists by Custom, then hold one and drag it where you want. Works in the grid and in the new list layout. New playlists join at the end; the order sticks.
+* Playlists, Albums, Artists, Album artists and Genres can each be shown as a list instead of a grid. Tap the layout button next to the sort menu.
+* Favourites is pinned first until you move it yourself.

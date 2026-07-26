@@ -12,6 +12,7 @@ import io.github.zyrouge.symphony.services.groove.repositories.PlaylistRepositor
 import io.github.zyrouge.symphony.services.groove.repositories.SongRepository
 import io.github.zyrouge.symphony.services.radio.AndroidAutoCategory
 import io.github.zyrouge.symphony.services.radio.RadioQueue
+import io.github.zyrouge.symphony.ui.components.MediaLayout
 import io.github.zyrouge.symphony.ui.components.ResponsiveGridColumns
 import io.github.zyrouge.symphony.ui.theme.ThemeMode
 import io.github.zyrouge.symphony.ui.theme.ThemePreset
@@ -133,6 +134,28 @@ class Settings(private val symphony: Symphony) {
         }
     }
 
+    /**
+     * MAZIKA: an ordered list of arbitrary ids, stored the same way as [EnumListEntry].
+     *
+     * [StringSetEntry] cannot back a user-defined order because `putStringSet` does not
+     * preserve one. Callers must keep commas out of the values; the only user of this so
+     * far stores playlist ids, which are `"<millis>.<i>"` or the literal `favorites`.
+     */
+    inner class StringListEntry(
+        key: String,
+        val defaultValue: List<String>,
+    ) : Entry<List<String>>(key) {
+        override fun getValueInternal() = getSharedPreferences().getString(key, null)
+            ?.let { stored ->
+                if (stored.isEmpty()) emptyList() else stored.split(",")
+            }
+            ?: defaultValue
+
+        override fun setValueInternal(value: List<String>) = getSharedPreferences().edit {
+            putString(key, value.joinToString(","))
+        }
+    }
+
     // MAZIKA: default to Sunset (orange on dark) instead of following the system,
     // and keep Material You off so the preset colour is what users actually see.
     // Turning Material You on still overrides the preset colour with the wallpaper
@@ -161,6 +184,11 @@ class Settings(private val symphony: Symphony) {
         "last_used_artists_vertical_grid_columns",
         ResponsiveGridColumns.DEFAULT_VERTICAL_COLUMNS,
     )
+    val lastUsedArtistsLayout = EnumEntry(
+        "last_used_artists_layout",
+        enumEntries<MediaLayout>(),
+        MediaLayout.GRID,
+    )
     val lastUsedAlbumArtistsSortBy = EnumEntry(
         "last_used_album_artists_sort_by",
         enumEntries<AlbumArtistRepository.SortBy>(),
@@ -176,6 +204,11 @@ class Settings(private val symphony: Symphony) {
         "last_used_album_artists_vertical_grid_columns",
         ResponsiveGridColumns.DEFAULT_VERTICAL_COLUMNS,
     )
+    val lastUsedAlbumArtistsLayout = EnumEntry(
+        "last_used_album_artists_layout",
+        enumEntries<MediaLayout>(),
+        MediaLayout.GRID,
+    )
     val lastUsedAlbumsSortBy = EnumEntry(
         "last_used_albums_sort_by",
         enumEntries<AlbumRepository.SortBy>(),
@@ -189,6 +222,11 @@ class Settings(private val symphony: Symphony) {
     val lastUsedAlbumsVerticalGridColumns = IntEntry(
         "last_used_albums_vertical_grid_columns",
         ResponsiveGridColumns.DEFAULT_VERTICAL_COLUMNS,
+    )
+    val lastUsedAlbumsLayout = EnumEntry(
+        "last_used_albums_layout",
+        enumEntries<MediaLayout>(),
+        MediaLayout.GRID,
     )
     val lastUsedGenresSortBy = EnumEntry(
         "last_used_genres_sort_by",
@@ -204,6 +242,11 @@ class Settings(private val symphony: Symphony) {
         "last_used_genres_vertical_grid_columns",
         ResponsiveGridColumns.DEFAULT_VERTICAL_COLUMNS,
     )
+    val lastUsedGenresLayout = EnumEntry(
+        "last_used_genres_layout",
+        enumEntries<MediaLayout>(),
+        MediaLayout.GRID,
+    )
     val lastUsedBrowserSortBy = EnumEntry(
         "last_used_folder_sort_by",
         enumEntries<SongRepository.SortBy>(),
@@ -217,6 +260,9 @@ class Settings(private val symphony: Symphony) {
         PlaylistRepository.SortBy.CUSTOM,
     )
     val lastUsedPlaylistsSortReverse = BooleanEntry("last_used_playlists_sort_reverse", false)
+    // MAZIKA: the user-defined order behind PlaylistRepository.SortBy.CUSTOM. Partial by
+    // design - ids missing from it still show up, at the end.
+    val playlistsCustomOrder = StringListEntry("playlists_custom_order", emptyList())
     val lastUsedPlaylistsHorizontalGridColumns = IntEntry(
         "last_used_playlists_horizontal_grid_columns",
         ResponsiveGridColumns.DEFAULT_HORIZONTAL_COLUMNS,
@@ -224,6 +270,11 @@ class Settings(private val symphony: Symphony) {
     val lastUsedPlaylistsVerticalGridColumns = IntEntry(
         "last_used_playlists_vertical_grid_columns",
         ResponsiveGridColumns.DEFAULT_VERTICAL_COLUMNS,
+    )
+    val lastUsedPlaylistsLayout = EnumEntry(
+        "last_used_playlists_layout",
+        enumEntries<MediaLayout>(),
+        MediaLayout.GRID,
     )
     val lastUsedPlaylistSongsSortBy = EnumEntry(
         "last_used_playlist_songs_sort_by",

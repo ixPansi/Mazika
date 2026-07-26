@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -83,6 +85,7 @@ fun GenreGrid(
             ResponsiveGridColumns(horizontalGridColumns, verticalGridColumns)
         }
     }
+    val layout by context.symphony.settings.lastUsedGenresLayout.flow.collectAsState()
     var showModifyLayoutSheet by remember { mutableStateOf(false) }
 
     MediaSortBarScaffold(
@@ -126,10 +129,22 @@ fun GenreGrid(
                     content = { Text(context.symphony.t.DamnThisIsSoEmpty) }
                 )
 
+                layout == MediaLayout.LIST -> LazyColumn {
+                    items(
+                        sortedGenreNames,
+                        key = { it },
+                        contentType = { Groove.Kind.GENRE },
+                    ) { genreName ->
+                        context.symphony.groove.genre.get(genreName)?.let { genre ->
+                            GenreListItem(context, genre.name, genre.numberOfTracks)
+                        }
+                    }
+                }
+
                 else -> ResponsiveGrid(gridColumns) { gridData ->
                     itemsIndexed(
                         sortedGenreNames,
-                        key = { i, x -> "$i-$x" },
+                        key = { _, x -> x },
                         contentType = { _, _ -> Groove.Kind.GENRE }
                     ) { i, genreName ->
                         context.symphony.groove.genre.get(genreName)?.let { genre ->
@@ -194,8 +209,12 @@ fun GenreGrid(
             }
 
             if (showModifyLayoutSheet) {
-                ResponsiveGridSizeAdjustBottomSheet(
+                MediaLayoutAdjustDialog(
                     context,
+                    layout = layout,
+                    onLayoutChange = {
+                        context.symphony.settings.lastUsedGenresLayout.setValue(it)
+                    },
                     columns = gridColumns,
                     onColumnsChange = {
                         context.symphony.settings.lastUsedGenresHorizontalGridColumns.setValue(

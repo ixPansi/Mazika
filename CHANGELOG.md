@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026.7.121 — 2026-07-26
+
+### Added
+- **Playlists can be put in your own order.** Sort by **Custom**, then hold a playlist and
+  drag it where you want. "Custom" previously meant nothing at all — it pinned Favorites
+  first and then handed back whatever order the underlying map happened to yield, with no
+  way to change it.
+  - The stored order is deliberately partial, because playlists are created and deleted
+    between one read and the next: a new playlist joins at the **end** rather than
+    somewhere in the middle, and a deleted one leaves the rest untouched.
+  - Favorites stays pinned first until you move it yourself, after which it is treated like
+    any other playlist.
+  - Dragging with the sort reversed stores the order the right way round, so flipping the
+    arrow afterwards shows the mirror of what you built rather than a scrambled list.
+- **A list layout for Playlists, Albums, Artists, Album artists and Genres.** The layout
+  button beside the sort menu now offers grid or list, and the column slider appears only
+  for a grid, where it means something.
+- **Dragging works in the grid too**, not only the list. This needed a second reorder
+  engine: the existing one is built on `LazyColumn` and hit-tests on one axis, which cannot
+  express moving a cell sideways within a row. The two share their pure parts — the drag
+  session, the single-move contract and the edge auto-scroll — and the grid targets the
+  nearest cell by straight-line distance, with the same dead band that stops rows flapping
+  at a boundary.
+
 ## 2026.7.120 — 2026-07-26
 
 ### Fixed
