@@ -3,6 +3,7 @@ package io.github.zyrouge.symphony.services.groove.repositories
 import android.net.Uri
 import io.github.zyrouge.symphony.Symphony
 import io.github.zyrouge.symphony.services.groove.Playlist
+import io.github.zyrouge.symphony.services.groove.applyStoredOrder
 import io.github.zyrouge.symphony.utils.ActivityUtils
 import io.github.zyrouge.symphony.utils.FuzzySearchOption
 import io.github.zyrouge.symphony.utils.FuzzySearcher
@@ -153,9 +154,10 @@ class PlaylistRepository(private val symphony: Symphony) {
     fun sort(playlistIds: List<String>, by: SortBy, reverse: Boolean): List<String> {
         val sensitive = symphony.settings.caseSensitiveSorting.value
         val sorted = when (by) {
-            SortBy.CUSTOM -> applyCustomOrder(
+            SortBy.CUSTOM -> applyStoredOrder(
                 playlistIds,
                 symphony.settings.playlistsCustomOrder.value,
+                pinnedFirst = listOf(FAVORITE_PLAYLIST),
             )
 
             SortBy.TITLE -> playlistIds.sortedBy { get(it)?.title?.withCase(sensitive) }
@@ -367,34 +369,5 @@ class PlaylistRepository(private val symphony: Symphony) {
 
     companion object {
         private const val FAVORITE_PLAYLIST = "favorites"
-
-        /**
-         * MAZIKA: applies a user-defined order to the playlists that currently exist.
-         *
-         * The stored order is deliberately *partial*. Playlists are created and deleted
-         * between one read and the next, so it can neither be treated as the full list nor
-         * rewritten on every change:
-         *
-         * - ids missing from it still have to appear, and belong at the **end** - that is
-         *   where a newly created playlist should show up, not somewhere in the middle.
-         *   [sortedBy] is stable, so they keep their relative order rather than shuffling.
-         * - ids in it that no longer exist are simply never matched.
-         *
-         * With nothing stored this is the previous behaviour: Favorites first, everything
-         * else after it. Once an order exists Favorites is just another id in it, so it can
-         * be dragged anywhere like any other playlist.
-         */
-        internal fun applyCustomOrder(
-            playlistIds: List<String>,
-            storedOrder: List<String>,
-        ): List<String> {
-            if (storedOrder.isEmpty()) {
-                val prefix = playlistIds.filter { it == FAVORITE_PLAYLIST }
-                return prefix + playlistIds.filterNot { it == FAVORITE_PLAYLIST }
-            }
-            val ranks = HashMap<String, Int>(storedOrder.size)
-            storedOrder.forEachIndexed { index, id -> ranks.putIfAbsent(id, index) }
-            return playlistIds.sortedBy { ranks[it] ?: Int.MAX_VALUE }
-        }
     }
 }

@@ -176,6 +176,7 @@ class Settings(private val symphony: Symphony) {
         ArtistRepository.SortBy.ARTIST_NAME,
     )
     val lastUsedArtistsSortReverse = BooleanEntry("last_used_artists_sort_reverse", false)
+    val artistsCustomOrder = StringListEntry("artists_custom_order", emptyList())
     val lastUsedArtistsHorizontalGridColumns = IntEntry(
         "last_used_artists_horizontal_grid_columns",
         ResponsiveGridColumns.DEFAULT_HORIZONTAL_COLUMNS,
@@ -196,6 +197,7 @@ class Settings(private val symphony: Symphony) {
     )
     val lastUsedAlbumArtistsSortReverse =
         BooleanEntry("last_used_album_artists_sort_reverse", false)
+    val albumArtistsCustomOrder = StringListEntry("album_artists_custom_order", emptyList())
     val lastUsedAlbumArtistsHorizontalGridColumns = IntEntry(
         "last_used_album_artists_horizontal_grid_columns",
         ResponsiveGridColumns.DEFAULT_HORIZONTAL_COLUMNS,
@@ -215,6 +217,7 @@ class Settings(private val symphony: Symphony) {
         AlbumRepository.SortBy.ALBUM_NAME,
     )
     val lastUsedAlbumsSortReverse = BooleanEntry("last_used_albums_sort_reverse", false)
+    val albumsCustomOrder = StringListEntry("albums_custom_order", emptyList())
     val lastUsedAlbumsHorizontalGridColumns = IntEntry(
         "last_used_albums_horizontal_grid_columns",
         ResponsiveGridColumns.DEFAULT_HORIZONTAL_COLUMNS,
@@ -234,6 +237,7 @@ class Settings(private val symphony: Symphony) {
         GenreRepository.SortBy.GENRE,
     )
     val lastUsedGenresSortReverse = BooleanEntry("last_used_genres_sort_reverse", false)
+    val genresCustomOrder = StringListEntry("genres_custom_order", emptyList())
     val lastUsedGenresHorizontalGridColumns = IntEntry(
         "last_used_genres_horizontal_grid_columns",
         ResponsiveGridColumns.DEFAULT_HORIZONTAL_COLUMNS,
@@ -308,6 +312,11 @@ class Settings(private val symphony: Symphony) {
     val lastUsedFoldersVerticalGridColumns = IntEntry(
         "last_used_folders_vertical_grid_columns",
         ResponsiveGridColumns.DEFAULT_VERTICAL_COLUMNS,
+    )
+    val lastUsedFoldersLayout = EnumEntry(
+        "last_used_folders_layout",
+        enumEntries<MediaLayout>(),
+        MediaLayout.GRID,
     )
     val lastDisabledTreePaths = StringSetEntry("last_disabled_tree_paths", emptySet())
     val previousSongQueue = object : Entry<RadioQueue.Serialized?>("previous_song_queue") {

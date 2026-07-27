@@ -1,14 +1,15 @@
-package io.github.zyrouge.symphony.services.groove.repositories
+package io.github.zyrouge.symphony.services.groove
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class PlaylistCustomOrderTest {
+class CustomOrderTest {
     @Test
     fun withNothingStored_favoritesComesFirst() {
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("b", "favorites", "a"),
+        val ordered = applyStoredOrder(
+            ids = listOf("b", "favorites", "a"),
             storedOrder = emptyList(),
+            pinnedFirst = FAVORITES,
         )
 
         assertEquals(listOf("favorites", "b", "a"), ordered)
@@ -16,9 +17,10 @@ class PlaylistCustomOrderTest {
 
     @Test
     fun withNothingStored_nonFavouritesKeepTheirIncomingOrder() {
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("c", "a", "b"),
+        val ordered = applyStoredOrder(
+            ids = listOf("c", "a", "b"),
             storedOrder = emptyList(),
+            pinnedFirst = FAVORITES,
         )
 
         assertEquals(listOf("c", "a", "b"), ordered)
@@ -26,9 +28,10 @@ class PlaylistCustomOrderTest {
 
     @Test
     fun storedOrderIsApplied() {
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("a", "b", "favorites"),
+        val ordered = applyStoredOrder(
+            ids = listOf("a", "b", "favorites"),
             storedOrder = listOf("b", "favorites", "a"),
+            pinnedFirst = FAVORITES,
         )
 
         assertEquals(listOf("b", "favorites", "a"), ordered)
@@ -38,9 +41,10 @@ class PlaylistCustomOrderTest {
     fun favoritesIsDraggableOnceAnOrderExists() {
         // The default pins it first; an explicit order must be allowed to override that,
         // otherwise the user cannot move it and the pin looks like a bug.
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("favorites", "a"),
+        val ordered = applyStoredOrder(
+            ids = listOf("favorites", "a"),
             storedOrder = listOf("a", "favorites"),
+            pinnedFirst = FAVORITES,
         )
 
         assertEquals(listOf("a", "favorites"), ordered)
@@ -48,8 +52,8 @@ class PlaylistCustomOrderTest {
 
     @Test
     fun newPlaylistsLandAtTheEnd() {
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("a", "b", "fresh"),
+        val ordered = applyStoredOrder(
+            ids = listOf("a", "b", "fresh"),
             storedOrder = listOf("b", "a"),
         )
 
@@ -59,8 +63,8 @@ class PlaylistCustomOrderTest {
     @Test
     fun severalNewPlaylistsKeepTheirRelativeOrder() {
         // sortedBy is stable, so unranked ids must not shuffle amongst themselves.
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("x", "a", "y", "b", "z"),
+        val ordered = applyStoredOrder(
+            ids = listOf("x", "a", "y", "b", "z"),
             storedOrder = listOf("b", "a"),
         )
 
@@ -69,8 +73,8 @@ class PlaylistCustomOrderTest {
 
     @Test
     fun deletedPlaylistsInTheStoredOrderAreIgnored() {
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("a", "c"),
+        val ordered = applyStoredOrder(
+            ids = listOf("a", "c"),
             storedOrder = listOf("c", "gone", "a"),
         )
 
@@ -81,8 +85,8 @@ class PlaylistCustomOrderTest {
     fun everyPlaylistSurvivesTheSort() {
         val playlistIds = listOf("a", "b", "c", "d")
 
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = playlistIds,
+        val ordered = applyStoredOrder(
+            ids = playlistIds,
             storedOrder = listOf("d", "b"),
         )
 
@@ -91,14 +95,38 @@ class PlaylistCustomOrderTest {
     }
 
     @Test
+    fun withoutAPin_nothingIsPromoted() {
+        // Albums, artists, album artists and genres pin nothing, so an unset order has to
+        // leave their incoming order completely alone.
+        val ids = listOf("c", "favorites", "a")
+
+        assertEquals(ids, applyStoredOrder(ids, storedOrder = emptyList()))
+    }
+
+    @Test
+    fun aPinnedIdThatDoesNotExistIsSkipped() {
+        val ordered = applyStoredOrder(
+            ids = listOf("b", "a"),
+            storedOrder = emptyList(),
+            pinnedFirst = FAVORITES,
+        )
+
+        assertEquals(listOf("b", "a"), ordered)
+    }
+
+    @Test
     fun aDuplicatedStoredIdDoesNotChangeItsRank() {
         // A corrupt or hand-edited preference must not reorder anything unexpectedly; the
         // first occurrence wins.
-        val ordered = PlaylistRepository.applyCustomOrder(
-            playlistIds = listOf("a", "b"),
+        val ordered = applyStoredOrder(
+            ids = listOf("a", "b"),
             storedOrder = listOf("b", "a", "b"),
         )
 
         assertEquals(listOf("b", "a"), ordered)
+    }
+
+    companion object {
+        private val FAVORITES = listOf("favorites")
     }
 }

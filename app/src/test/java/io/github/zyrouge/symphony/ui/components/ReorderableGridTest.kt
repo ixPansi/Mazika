@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ReorderableGridTest {
@@ -119,6 +120,86 @@ class ReorderableGridTest {
         )
 
         assertEquals(3, target)
+    }
+
+    @Test
+    fun draggingForward_slidesTheSpanBackOneSlot() {
+        // Holding item 1 over slot 4: everything in 2..4 moves back to make room.
+        assertEquals(null, calculateReorderPreviewSlot(0, sourceIndex = 1, targetIndex = 4))
+        assertEquals(null, calculateReorderPreviewSlot(1, sourceIndex = 1, targetIndex = 4))
+        assertEquals(1, calculateReorderPreviewSlot(2, sourceIndex = 1, targetIndex = 4))
+        assertEquals(3, calculateReorderPreviewSlot(4, sourceIndex = 1, targetIndex = 4))
+        assertEquals(null, calculateReorderPreviewSlot(5, sourceIndex = 1, targetIndex = 4))
+    }
+
+    @Test
+    fun draggingBackwards_slidesTheSpanForwardOneSlot() {
+        assertEquals(null, calculateReorderPreviewSlot(1, sourceIndex = 4, targetIndex = 2))
+        assertEquals(3, calculateReorderPreviewSlot(2, sourceIndex = 4, targetIndex = 2))
+        assertEquals(4, calculateReorderPreviewSlot(3, sourceIndex = 4, targetIndex = 2))
+        assertEquals(null, calculateReorderPreviewSlot(4, sourceIndex = 4, targetIndex = 2))
+    }
+
+    @Test
+    fun nothingMovesWithoutADrag() {
+        assertEquals(null, calculateReorderPreviewSlot(2, sourceIndex = null, targetIndex = 4))
+        assertEquals(null, calculateReorderPreviewSlot(2, sourceIndex = 1, targetIndex = null))
+    }
+
+    @Test
+    fun nothingMovesWhenTheTargetIsTheSource() {
+        (0..5).forEach { index ->
+            assertEquals(null, calculateReorderPreviewSlot(index, sourceIndex = 3, targetIndex = 3))
+        }
+    }
+
+    @Test
+    fun theGridMovesExactlyTheItemsTheListMoves() {
+        // The whole point of sharing the span conditions: a drag has to displace the same
+        // items whichever layout the user is looking at. Only the distance differs.
+        val size = 7
+        for (source in 0 until size) {
+            for (target in 0 until size) {
+                for (index in 0 until size) {
+                    val listMoves = calculateReorderPreviewOffset(
+                        index = index,
+                        sourceIndex = source,
+                        targetIndex = target,
+                        draggedSizePx = 100,
+                    ) != 0
+                    val gridMoves = calculateReorderPreviewSlot(
+                        index = index,
+                        sourceIndex = source,
+                        targetIndex = target,
+                    ) != null
+
+                    assertEquals(
+                        listMoves,
+                        gridMoves,
+                        "index=$index source=$source target=$target",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun theDestinationSlotIsAlwaysTowardsTheSource() {
+        // A cell must never be told to slide past the dragged item's own slot, which would
+        // open the gap in the wrong place.
+        val size = 7
+        for (source in 0 until size) {
+            for (target in 0 until size) {
+                for (index in 0 until size) {
+                    val slot = calculateReorderPreviewSlot(index, source, target) ?: continue
+                    assertTrue(slot in 0 until size, "slot $slot out of bounds")
+                    assertTrue(
+                        if (source < target) slot < index else slot > index,
+                        "index=$index source=$source target=$target slot=$slot",
+                    )
+                }
+            }
+        }
     }
 
     @Test

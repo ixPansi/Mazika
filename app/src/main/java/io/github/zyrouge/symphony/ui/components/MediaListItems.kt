@@ -16,6 +16,9 @@ import io.github.zyrouge.symphony.ui.view.AlbumViewRoute
 import io.github.zyrouge.symphony.ui.view.ArtistViewRoute
 import io.github.zyrouge.symphony.ui.view.GenreViewRoute
 import io.github.zyrouge.symphony.ui.view.PlaylistViewRoute
+import io.github.zyrouge.symphony.ui.view.home.FolderDropdownMenu
+import io.github.zyrouge.symphony.ui.view.home.createArtworkImageRequest
+import io.github.zyrouge.symphony.utils.SimpleFileSystem
 
 /**
  * MAZIKA: the row forms of the browse tiles, for [MediaLayout.LIST].
@@ -138,6 +141,41 @@ fun AlbumArtistListItem(context: ViewContext, albumArtist: AlbumArtist) {
         onClick = {
             context.navController.navigate(AlbumArtistViewRoute(albumArtist.name))
         },
+    )
+}
+
+/**
+ * Folders show what is inside them rather than a track count, since that is what you are
+ * about to navigate into.
+ */
+@Composable
+fun FolderListItem(
+    context: ViewContext,
+    folder: SimpleFileSystem.Folder,
+    onClick: () -> Unit,
+) {
+    val subfolders = folder.children.values.count { it is SimpleFileSystem.Folder }
+    val songs = folder.children.values.count { it is SimpleFileSystem.File }
+
+    GenericGrooveCard(
+        image = folder.createArtworkImageRequest(context).build(),
+        title = {
+            Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        subtitle = {
+            Text(
+                listOfNotNull(
+                    subfolders.takeIf { it > 0 }?.let { context.symphony.t.XFolders(it.toString()) },
+                    songs.takeIf { it > 0 }?.let { context.symphony.t.XSongs(it.toString()) },
+                ).joinToString(" · ").ifEmpty { context.symphony.t.XSongs("0") },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        options = { expanded, onDismissRequest ->
+            FolderDropdownMenu(context, folder, expanded, onDismissRequest)
+        },
+        onClick = onClick,
     )
 }
 

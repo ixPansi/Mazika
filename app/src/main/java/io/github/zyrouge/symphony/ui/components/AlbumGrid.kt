@@ -1,8 +1,5 @@
 package io.github.zyrouge.symphony.ui.components
 
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,7 +25,12 @@ fun AlbumGrid(
 ) {
     val sortBy by context.symphony.settings.lastUsedAlbumsSortBy.flow.collectAsState()
     val sortReverse by context.symphony.settings.lastUsedAlbumsSortReverse.flow.collectAsState()
-    val sortedAlbumIds by remember(albumIds, sortBy, sortReverse) {
+    // The order lives in settings, not in the ids, so a drag changes neither the ids
+    // nor the sort - watching the setting is what tells this to re-sort.
+    val customOrder by context.symphony.settings.albumsCustomOrder.flow.collectAsState()
+    // Dragging only means something when the user is looking at their own order.
+    val canReorder = sortBy == AlbumRepository.SortBy.CUSTOM
+    val sortedAlbumIds by remember(albumIds, sortBy, sortReverse, customOrder) {
         derivedStateOf {
             context.symphony.groove.album.sort(albumIds, sortBy, sortReverse)
         }
@@ -79,29 +81,22 @@ fun AlbumGrid(
                     content = { Text(context.symphony.t.DamnThisIsSoEmpty) }
                 )
 
-                layout == MediaLayout.LIST -> LazyColumn {
-                    items(
-                        sortedAlbumIds,
-                        key = { it },
-                        contentType = { Groove.Kind.ALBUM },
-                    ) { albumId ->
-                        context.symphony.groove.album.get(albumId)?.let { album ->
-                            AlbumListItem(context, album)
-                        }
-                    }
-                }
-
-                else -> ResponsiveGrid(gridColumns) {
-                    itemsIndexed(
-                        sortedAlbumIds,
-                        key = { _, x -> x },
-                        contentType = { _, _ -> Groove.Kind.ALBUM }
-                    ) { _, albumId ->
-                        context.symphony.groove.album.get(albumId)?.let { album ->
-                            AlbumTile(context, album)
-                        }
-                    }
-                }
+                else -> ReorderableMediaContent(
+                    ids = sortedAlbumIds,
+                    canReorder = canReorder,
+                    layout = layout,
+                    gridColumns = gridColumns,
+                    sortReverse = sortReverse,
+                    sourceVersion = Triple(albumIds, sortBy, sortReverse),
+                    contentType = Groove.Kind.ALBUM,
+                    onReorder = { context.symphony.groove.album.setCustomOrder(it) },
+                    listItem = { id ->
+                        context.symphony.groove.album.get(id)?.let { AlbumListItem(context, it) }
+                    },
+                    gridItem = { _, id, _ ->
+                        context.symphony.groove.album.get(id)?.let { AlbumTile(context, it) }
+                    },
+                )
             }
 
             if (showModifyLayoutSheet) {

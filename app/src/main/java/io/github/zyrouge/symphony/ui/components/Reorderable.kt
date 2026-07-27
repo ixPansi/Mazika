@@ -520,10 +520,7 @@ fun ReorderableContainer(
     val markerTop = state.insertionTop(markerHeightPx)
     val animatedMarkerTop by animateFloatAsState(
         targetValue = markerTop ?: 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = ReorderableDefaults.markerSpring(),
         label = "reorder-marker",
     )
     Box(
@@ -551,7 +548,10 @@ fun ReorderableContainer(
                     .graphicsLayer {
                         alpha = if (markerTop == null) 0f else 1f
                     }
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)),
+                    .background(
+                        MaterialTheme.colorScheme.primary
+                            .copy(alpha = ReorderableDefaults.MARKER_ALPHA)
+                    ),
             )
         }
 
@@ -564,7 +564,7 @@ fun ReorderableContainer(
                     .fillMaxWidth()
                     .height(with(density) { state.draggedSizePx.toDp() }),
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp,
+                shadowElevation = ReorderableDefaults.DraggedElevation,
             ) {
                 draggedItem(draggedIndex)
             }
@@ -582,20 +582,20 @@ fun reorderableItemModifier(
     if (!enabled) return Modifier
     val previewOffset by animateFloatAsState(
         targetValue = state.previewOffsetFor(key).toFloat(),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
+        animationSpec = ReorderableDefaults.displacementSpring(),
         label = "reorder-row-offset",
     )
     return Modifier.graphicsLayer {
         translationY = previewOffset
-        alpha = if (state.draggingKey == key) 0f else 1f
+        alpha = ReorderableDefaults.alphaFor(state.draggingKey == key)
     }
 }
 
-private val REORDER_EDGE_BAND = 56.dp
-private val REORDER_MAX_SCROLL_SPEED = 420.dp
+// Feel is shared with the grid engine; see ReorderableDefaults. Only the hysteresis is
+// local, because it is about this engine's geometry rather than its feel: a list compares
+// distances along one axis, so its dead band can be tighter than a grid's.
+private val REORDER_EDGE_BAND = ReorderableDefaults.EdgeBand
+private val REORDER_MAX_SCROLL_SPEED = ReorderableDefaults.MaxScrollSpeed
 private val REORDER_HYSTERESIS = 10.dp
-private val REORDER_MARKER_HEIGHT = 3.dp
-private const val MAX_FRAME_STEP_SECONDS = 0.064f
+private val REORDER_MARKER_HEIGHT = ReorderableDefaults.MarkerThickness
+private const val MAX_FRAME_STEP_SECONDS = ReorderableDefaults.MAX_FRAME_STEP_SECONDS

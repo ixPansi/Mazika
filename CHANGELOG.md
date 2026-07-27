@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026.7.122 — 2026-07-27
+
+### Changed
+- **Dragging a tile now feels like dragging a row.** The grid engine shipped in 2026.7.121
+  without a "make room" preview, on the reasoning that a grid reflow cascades across row
+  boundaries and is easy to animate badly. The result was that reordering songs felt
+  considered while reordering tiles felt inert, which was the wrong trade. Cells now slide
+  aside to open the gap, and a cell crossing a row boundary travels up to the end of the row
+  above — the same movement `LazyGridItemScope.animateItem()` makes for the same situation.
+  - The displacement is measured between the two cells' real laid-out positions rather than
+    computed from a cell size, because a grid row is as tall as its tallest cell and the
+    genre cards are intrinsically sized. Measuring keeps a cell landing exactly on its
+    neighbour's slot whatever the row heights are.
+  - Both engines now share their springs, marker and lift through one place, so the two
+    drags cannot quietly drift apart again.
+
+### Added
+- **Albums, Artists, Album artists and Genres can be put in your own order**, the same way
+  playlists could from 2026.7.121: sort by **Custom**, then hold and drag, in grid or list.
+  Each remembers its own order, new entries join at the end, and entries that disappear on a
+  rescan leave the rest undisturbed.
+- **A list layout for Folders**, the one browse tab 2026.7.121 missed. Folder rows show what
+  is inside — subfolders and songs — and carry the same menu the tiles do.
+
+### Internal
+- The per-tab reorder wiring is now one shared component rather than six copies, and the
+  partial-order logic is one function shared by every repository that has a Custom sort.
+
 ## 2026.7.121 — 2026-07-26
 
 ### Added

@@ -1,8 +1,7 @@
 package io.github.zyrouge.symphony.ui.components
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateOffsetAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -56,16 +55,19 @@ import kotlin.math.roundToInt
  * [ReorderSession], [movedItem], [dataIndexForLazyIndex] and [calculateAutoScrollVelocity]
  * (a grid scrolls vertically, so that one applies unchanged).
  *
- * Two things differ by design:
+ * What differs is targeting and displacement, both because a grid is two-dimensional:
  *
  * - **Targeting is 2D.** Cells sit in rows *and* columns, so the target is the nearest cell
  *   center by straight-line distance rather than by vertical distance.
- * - **There is no "make room" preview.** In a list, rows displace along one axis, which
- *   [calculateReorderPreviewOffset] expresses in a line. Moving a cell in a grid reflows
- *   every following cell across row boundaries; animating that convincingly is a large
- *   problem and animating it badly is worse than not animating it. The source cell is
- *   hidden, its copy floats under the finger, and an insertion bar marks where it will
- *   land - which reads clearly on its own.
+ * - **Displacement is an [Offset], resolved from real positions.** A list row shifts by a
+ *   fixed number of pixels along one axis ([calculateReorderPreviewOffset]). A cell moves to
+ *   the neighbouring *slot*, which for the first cell in a row is the end of the row above -
+ *   so [calculateReorderPreviewSlot] names the slot and
+ *   [ReorderableGridState.previewOffsetFor] measures the distance to it. Rows can differ in
+ *   height, so measuring beats assuming.
+ *
+ * The two engines share their feel through [ReorderableDefaults]: same springs, same marker,
+ * same lift under the finger. A drag should not feel different for being in a grid.
  *
  * As in the list engine, the caller's list is never modified during the gesture: a normal
  * release emits at most one move.
@@ -102,6 +104,29 @@ internal fun calculateReorderTargetGrid(
         currentTarget
     } else {
         candidate.index
+    }
+}
+
+/**
+ * The slot an item slides into while the dragged item is held over [targetIndex], or null
+ * when it stays put.
+ *
+ * The span conditions are deliberately identical to [calculateReorderPreviewOffset], so
+ * both engines agree on *which* items move; only how far they move differs. In a list that
+ * is a fixed number of pixels along one axis. In a grid an item moves to the neighbouring
+ * **slot**, which for the first cell in a row is the end of the row above - so the caller
+ * resolves this slot to a real position rather than assuming a distance.
+ */
+internal fun calculateReorderPreviewSlot(
+    index: Int,
+    sourceIndex: Int?,
+    targetIndex: Int?,
+): Int? {
+    if (sourceIndex == null || targetIndex == null) return null
+    return when {
+        sourceIndex < targetIndex && index in (sourceIndex + 1)..targetIndex -> index - 1
+        targetIndex < sourceIndex && index in targetIndex until sourceIndex -> index + 1
+        else -> null
     }
 }
 
@@ -295,6 +320,31 @@ class ReorderableGridState internal constructor(
         )
     }
 
+    /**
+     * How far a cell slides to open the gap, taken from where the two cells actually are.
+     *
+     * Computing this from a single cell size would be wrong on the very tabs this is for: a
+     * [androidx.compose.foundation.lazy.grid.LazyVerticalGrid] row is as tall as its tallest
+     * cell, and GenreGrid sizes its cards with `IntrinsicSize.Min`, so rows genuinely differ
+     * in height. Reading both rects keeps the cell landing exactly on its neighbour's slot
+     * whatever the row heights are.
+     *
+     * A destination that has scrolled out of view yields no displacement - that cell is off
+     * screen, so nothing about its movement is visible anyway.
+     */
+    internal fun previewOffsetFor(key: Any): Offset {
+        val keys = itemKeys()
+        val index = keys.indexOf(key).takeIf { it >= 0 } ?: return ReorderableDefaults.NoDisplacement
+        val destination = calculateReorderPreviewSlot(index, draggedIndex, targetIndex)
+            ?: return ReorderableDefaults.NoDisplacement
+        val visible = visibleReorderableItems(keys)
+        val own = visible.firstOrNull { (_, dataIndex) -> dataIndex == index }
+            ?: return ReorderableDefaults.NoDisplacement
+        val into = visible.firstOrNull { (_, dataIndex) -> dataIndex == destination }
+            ?: return ReorderableDefaults.NoDisplacement
+        return into.first.rect().topLeft - own.first.rect().topLeft
+    }
+
     internal fun autoScrollVelocity(edgeBandPx: Float, maxSpeedPxPerSecond: Float): Float {
         val info = gridState.layoutInfo
         return calculateAutoScrollVelocity(
@@ -391,18 +441,12 @@ fun ReorderableGridContainer(
     val markerOrigin = state.insertionOrigin(markerWidthPx)
     val animatedMarkerX by animateFloatAsState(
         targetValue = markerOrigin?.x ?: 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = ReorderableDefaults.markerSpring(),
         label = "grid-reorder-marker-x",
     )
     val animatedMarkerY by animateFloatAsState(
         targetValue = markerOrigin?.y ?: 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = ReorderableDefaults.markerSpring(),
         label = "grid-reorder-marker-y",
     )
     Box(
@@ -430,7 +474,10 @@ fun ReorderableGridContainer(
                     .graphicsLayer {
                         alpha = if (markerOrigin == null) 0f else 1f
                     }
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)),
+                    .background(
+                        MaterialTheme.colorScheme.primary
+                            .copy(alpha = ReorderableDefaults.MARKER_ALPHA)
+                    ),
             )
         }
 
@@ -448,7 +495,7 @@ fun ReorderableGridContainer(
                         height = with(density) { state.draggedHeightPx.toDp() },
                     ),
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp,
+                shadowElevation = ReorderableDefaults.DraggedElevation,
             ) {
                 draggedItem(draggedIndex)
             }
@@ -456,7 +503,17 @@ fun ReorderableGridContainer(
     }
 }
 
-/** Hides the source cell while the parent overlay renders its opaque copy. */
+/**
+ * Slides a cell aside to open the gap, and hides the source cell while the parent overlay
+ * renders its opaque copy.
+ *
+ * The list counterpart is [reorderableItemModifier]; both use the same spring, so a drag
+ * settles at the same rate whichever layout the user is in. Here the displacement is an
+ * [Offset] rather than a single axis, because a cell crossing a row boundary travels back
+ * across the grid as well as up - which is what
+ * [androidx.compose.foundation.lazy.grid.LazyGridItemScope.animateItem] does for the same
+ * situation.
+ */
 @Composable
 fun reorderableGridItemModifier(
     state: ReorderableGridState,
@@ -464,13 +521,24 @@ fun reorderableGridItemModifier(
     enabled: Boolean = true,
 ): Modifier {
     if (!enabled) return Modifier
+    val previewOffset by animateOffsetAsState(
+        targetValue = state.previewOffsetFor(key),
+        animationSpec = ReorderableDefaults.displacementSpring(),
+        label = "grid-reorder-cell-offset",
+    )
     return Modifier.graphicsLayer {
-        alpha = if (state.draggingKey == key) 0f else 1f
+        translationX = previewOffset.x
+        translationY = previewOffset.y
+        alpha = ReorderableDefaults.alphaFor(state.draggingKey == key)
     }
 }
 
-private val GRID_REORDER_EDGE_BAND = 56.dp
-private val GRID_REORDER_MAX_SCROLL_SPEED = 420.dp
+// Feel is shared with the list engine; see ReorderableDefaults. The hysteresis is local
+// and larger than the list's, because this compares straight-line distance in two axes -
+// a diagonal neighbour sits closer than a vertical one does in a list, so the dead band
+// has to be wider to stay as steady.
+private val GRID_REORDER_EDGE_BAND = ReorderableDefaults.EdgeBand
+private val GRID_REORDER_MAX_SCROLL_SPEED = ReorderableDefaults.MaxScrollSpeed
 private val GRID_REORDER_HYSTERESIS = 16.dp
-private val GRID_REORDER_MARKER_WIDTH = 3.dp
-private const val GRID_MAX_FRAME_STEP_SECONDS = 0.064f
+private val GRID_REORDER_MARKER_WIDTH = ReorderableDefaults.MarkerThickness
+private const val GRID_MAX_FRAME_STEP_SECONDS = ReorderableDefaults.MAX_FRAME_STEP_SECONDS

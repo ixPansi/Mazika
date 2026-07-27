@@ -1,0 +1,5 @@
+Dragging feels the same everywhere, and more things can be dragged.
+
+* Tiles now slide aside to open a gap as you drag, exactly as rows do when you reorder songs or the queue. Cells crossing a row move up to the end of the row above.
+* Albums, Artists, Album artists and Genres can be put in your own order too: sort by Custom, then hold and drag. Grid or list.
+* Folders can be shown as a list.

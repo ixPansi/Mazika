@@ -10,9 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Card
@@ -64,6 +61,77 @@ private object GenreTile {
     )
 }
 
+/**
+ * The coloured genre card, lifted out of [GenreGrid]'s lazy scope so the drag overlay can
+ * render an identical copy. Both its colour and its edge padding key off the position in
+ * the grid, which is why it takes [index] and [gridData] rather than reading them.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GenreCard(
+    context: ViewContext,
+    name: String,
+    numberOfTracks: Int,
+    index: Int,
+    gridData: ResponsiveGridData,
+) {
+    Card(
+        modifier = Modifier
+            .height(IntrinsicSize.Min)
+            .padding(
+                start = if (index % gridData.columnsCount == 0) 12.dp else 0.dp,
+                end = if ((index - 1) % gridData.columnsCount == 0) 12.dp else 8.dp,
+                bottom = 8.dp,
+            ),
+        colors = GenreTile.cardColors(index),
+        onClick = {
+            context.navController.navigate(GenreViewRoute(name))
+        }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .defaultMinSize(minHeight = 88.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .matchParentSize()
+                    .fillMaxWidth()
+                    .alpha(0.25f)
+                    .absoluteOffset(8.dp, 12.dp)
+            ) {
+                Text(
+                    name,
+                    textAlign = TextAlign.Start,
+                    style = MaterialTheme.typography.displaySmall
+                        .copy(fontWeight = FontWeight.Bold),
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                )
+            }
+            Column(
+                modifier = Modifier.padding(8.dp, 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    name,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge
+                        .copy(fontWeight = FontWeight.Bold),
+                )
+                Text(
+                    context.symphony.t.XSongs(numberOfTracks.toString()),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GenreGrid(
@@ -73,7 +141,12 @@ fun GenreGrid(
 ) {
     val sortBy by context.symphony.settings.lastUsedGenresSortBy.flow.collectAsState()
     val sortReverse by context.symphony.settings.lastUsedGenresSortReverse.flow.collectAsState()
-    val sortedGenreNames by remember(genreNames, sortBy, sortReverse) {
+    // The order lives in settings, not in the ids, so a drag changes neither the ids
+    // nor the sort - watching the setting is what tells this to re-sort.
+    val customOrder by context.symphony.settings.genresCustomOrder.flow.collectAsState()
+    // Dragging only means something when the user is looking at their own order.
+    val canReorder = sortBy == GenreRepository.SortBy.CUSTOM
+    val sortedGenreNames by remember(genreNames, sortBy, sortReverse, customOrder) {
         derivedStateOf {
             context.symphony.groove.genre.sort(genreNames, sortBy, sortReverse)
         }
@@ -129,83 +202,26 @@ fun GenreGrid(
                     content = { Text(context.symphony.t.DamnThisIsSoEmpty) }
                 )
 
-                layout == MediaLayout.LIST -> LazyColumn {
-                    items(
-                        sortedGenreNames,
-                        key = { it },
-                        contentType = { Groove.Kind.GENRE },
-                    ) { genreName ->
+                else -> ReorderableMediaContent(
+                    ids = sortedGenreNames,
+                    canReorder = canReorder,
+                    layout = layout,
+                    gridColumns = gridColumns,
+                    sortReverse = sortReverse,
+                    sourceVersion = Triple(genreNames, sortBy, sortReverse),
+                    contentType = Groove.Kind.GENRE,
+                    onReorder = { context.symphony.groove.genre.setCustomOrder(it) },
+                    listItem = { genreName ->
                         context.symphony.groove.genre.get(genreName)?.let { genre ->
                             GenreListItem(context, genre.name, genre.numberOfTracks)
                         }
-                    }
-                }
-
-                else -> ResponsiveGrid(gridColumns) { gridData ->
-                    itemsIndexed(
-                        sortedGenreNames,
-                        key = { _, x -> x },
-                        contentType = { _, _ -> Groove.Kind.GENRE }
-                    ) { i, genreName ->
+                    },
+                    gridItem = { index, genreName, gridData ->
                         context.symphony.groove.genre.get(genreName)?.let { genre ->
-                            Card(
-                                modifier = Modifier
-                                    .height(IntrinsicSize.Min)
-                                    .padding(
-                                        start = if (i % gridData.columnsCount == 0) 12.dp else 0.dp,
-                                        end = if ((i - 1) % gridData.columnsCount == 0) 12.dp else 8.dp,
-                                        bottom = 8.dp,
-                                    ),
-                                colors = GenreTile.cardColors(i),
-                                onClick = {
-                                    context.navController.navigate(GenreViewRoute(genre.name))
-                                }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .defaultMinSize(minHeight = 88.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .matchParentSize()
-                                            .fillMaxWidth()
-                                            .alpha(0.25f)
-                                            .absoluteOffset(8.dp, 12.dp)
-                                    ) {
-                                        Text(
-                                            genre.name,
-                                            textAlign = TextAlign.Start,
-                                            style = MaterialTheme.typography.displaySmall
-                                                .copy(fontWeight = FontWeight.Bold),
-                                            softWrap = false,
-                                            overflow = TextOverflow.Clip,
-                                        )
-                                    }
-                                    Column(
-                                        modifier = Modifier.padding(8.dp, 16.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center,
-                                    ) {
-                                        Text(
-                                            genre.name,
-                                            textAlign = TextAlign.Center,
-                                            style = MaterialTheme.typography.bodyLarge
-                                                .copy(fontWeight = FontWeight.Bold),
-                                        )
-                                        Text(
-                                            context.symphony.t.XSongs(genre.numberOfTracks.toString()),
-                                            textAlign = TextAlign.Center,
-                                            style = MaterialTheme.typography.labelSmall,
-                                        )
-                                    }
-                                }
-                            }
+                            GenreCard(context, genre.name, genre.numberOfTracks, index, gridData)
                         }
-                    }
-                }
+                    },
+                )
             }
 
             if (showModifyLayoutSheet) {

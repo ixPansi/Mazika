@@ -1,6 +1,7 @@
 package io.github.zyrouge.symphony.services.groove.repositories
 
 import io.github.zyrouge.symphony.Symphony
+import io.github.zyrouge.symphony.services.groove.applyStoredOrder
 import io.github.zyrouge.symphony.services.groove.Artist
 import io.github.zyrouge.symphony.services.groove.Song
 import io.github.zyrouge.symphony.ui.helpers.Assets
@@ -95,12 +96,21 @@ class ArtistRepository(private val symphony: Symphony) {
     fun sort(artistNames: List<String>, by: SortBy, reverse: Boolean): List<String> {
         val sensitive = symphony.settings.caseSensitiveSorting.value
         val sorted = when (by) {
-            SortBy.CUSTOM -> artistNames
+            SortBy.CUSTOM -> applyStoredOrder(
+                artistNames,
+                symphony.settings.artistsCustomOrder.value,
+            )
+
             SortBy.ARTIST_NAME -> artistNames.sortedBy { get(it)?.name?.withCase(sensitive) }
             SortBy.TRACKS_COUNT -> artistNames.sortedBy { get(it)?.numberOfTracks }
             SortBy.ALBUMS_COUNT -> artistNames.sortedBy { get(it)?.numberOfTracks }
         }
         return if (reverse) sorted.reversed() else sorted
+    }
+
+    /** MAZIKA: stores the order the user dragged these into; see [applyStoredOrder]. */
+    fun setCustomOrder(ids: List<String>) {
+        symphony.settings.artistsCustomOrder.setValue(ids)
     }
 
     fun count() = cache.size
