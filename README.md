@@ -13,7 +13,9 @@
 
 > MAZIKA is an independent fork of [Symphony](https://github.com/zyrouge/symphony) by
 > Zyrouge, **modified by ixPansi in 2026** to add Android Auto, custom playlist and song
-> covers, a Recently played row, rewritten drag-to-reorder, theme presets with matching
+> covers, a Recently played row, multi-select with bulk actions, user-defined ordering of
+> playlists, albums, artists and genres, a list layout alongside the grid on every browse
+> tab, rewritten drag-to-reorder, on-demand update checks, theme presets with matching
 > launcher icons, and configurable fades. It is **not** affiliated with or endorsed by the
 > Symphony authors, and it installs alongside Symphony rather than replacing it.
 
@@ -28,9 +30,11 @@
 | **Custom song covers** | — | Same, and they survive a library rescan |
 | **Recently played** | — | What you played *from* — albums, artists, playlists, folders |
 | **Select many songs** | — | Long-press to select, then bulk play, queue, playlist, favourite or cover |
-| **Drag to reorder** | Queue and playlists, unreliable | Rewritten; also home tabs, For You, car categories — and Playlists, Albums, Artists, Album artists and Genres themselves, in grid *or* list |
-| **Grid or list** | Grid only | Either, per tab, on every browse tab including Folders |
+| **Your own order** | "Custom" sorts nothing at all | Drag Playlists, Albums, Artists, Album artists and Genres into any order you like |
+| **Drag to reorder** | Queue and playlists, unreliable | Rewritten; also home tabs, For You, car categories and every browse tab, in grid *or* list |
+| **Grid or list** | Grid only | Either, remembered per tab, on all six browse tabs |
 | **Favourite a song** | Buried in the overflow menu | One tap on the row |
+| **Update check** | On startup | On startup, plus a **Check now** button with the last-checked time |
 | **Theme presets** | Mode and colour, set separately | Six one-tap presets |
 | **Launcher icon** | Fixed | Follows your theme |
 | **Seek durations** | Forward and back shared one value | Independent (15 s / 30 s) |
@@ -97,9 +101,58 @@ streaming and no network access it doesn't need.
 </details>
 
 <details>
+<summary><b>Put your library in your own order</b></summary>
+
+Symphony offers a **Custom** sort on most tabs, but it does nothing — it hands back whatever
+order the library happened to load in, and there is no way to change it.
+
+- **Sort by Custom, then hold and drag.** Works on **Playlists, Albums, Artists, Album
+  artists** and **Genres**, in either layout. Each tab remembers its own order.
+- The stored order is **partial by design**, because a music library is not static. Something
+  newly added joins at the **end** rather than appearing in the middle of an order you
+  arranged by hand, and something that disappears on a rescan leaves the rest exactly where
+  you put them.
+- Reversing the sort shows your order backwards, as you would expect — and dragging while
+  reversed stores it the right way round rather than scrambling it.
+- Favourites stays pinned to the top of Playlists until you move it yourself.
+
+</details>
+
+<details>
+<summary><b>Grid or list, on every tab</b></summary>
+
+- **Playlists, Albums, Artists, Album artists, Genres** and **Folders** can each be shown as
+  a grid of tiles or a list of rows. The choice is remembered per tab.
+- The layout button sits next to the sort menu, and the column-count slider now appears only
+  for a grid, where it means something.
+- Row menus are the same menus the tiles have, so what you can do with a playlist doesn't
+  depend on how you happen to be looking at it.
+
+</details>
+
+<details>
+<summary><b>Select several songs at once</b></summary>
+
+- **Long-press a song** to start selecting, then tap rows to add or remove. Available on
+  Songs, Albums, Artists, Album artists, Genres and Folders. On a playlist, where holding a
+  row already picks it up to reorder, selection starts from **⋮ → Select** instead — the
+  gesture isn't taken away from dragging.
+- Selected songs can be played, shuffled, played next, queued, added to a playlist,
+  favourited, given **one cover**, stripped of their custom covers, or removed from the
+  playlist you're looking at.
+- Selection is keyed on the row rather than the song id, because a playlist may legitimately
+  hold the same song twice. Selecting one copy selects **exactly that copy**, and removing
+  acts on that position rather than on every occurrence.
+- Adding to a playlist no longer duplicates songs already in it — easy to trip over once
+  whole albums can be selected at once.
+
+</details>
+
+<details>
 <summary><b>Reordering that works, everywhere</b></summary>
 
-Playlists, the queue, home tabs, For You sections and the car's categories.
+The queue, playlists, home tabs, For You sections, the car's categories, and every browse
+tab in both layouts.
 
 - Rows are tracked by **list key** rather than index, and at most one move is applied per
   layout pass. A touchscreen reports several times per drawn frame but a `LazyColumn` is
@@ -109,6 +162,25 @@ Playlists, the queue, home tabs, For You sections and the car's categories.
   `pointerInput` when its key changes, so the drag died after moving a single position.
 - Edge auto-scroll is one frame-driven loop at a fixed **dp per second**. It was pixels
   per *frame*, so a 120 Hz screen scrolled twice as fast as a 60 Hz one.
+- Grids get their own engine, because targeting there is two-dimensional — a cell sits
+  *beside* its neighbour as well as below it, which no amount of vertical comparison
+  expresses. Tiles slide aside to open a gap exactly as rows do, and a tile crossing a row
+  boundary travels up to the end of the row above.
+- The list never changes under your finger: a drag is a preview, and one move is written on
+  release.
+
+</details>
+
+<details>
+<summary><b>Updates, and the licence in the app</b></summary>
+
+- **Check for updates on demand**, not only at startup. The button shows what happened —
+  checking, up to date, failed, or how long ago it last looked — so a silent failure is
+  visible instead of indistinguishable from "no update".
+- Automatic checking is still there and still optional, now clearly labelled as happening on
+  startup.
+- **Settings → About** carries the AGPL notice, the no-warranty statement and links to the
+  source and the licence, as chips beneath the version.
 
 </details>
 

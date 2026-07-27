@@ -23,10 +23,16 @@ Modifications made by ixPansi in 2026:
   - Android Auto support (browse tree, voice search, queue artwork, ordering)
   - Custom playlist and song covers
   - Recently played on the For You page
-  - Rewritten drag-to-reorder
+  - Multi-select with bulk actions on song lists
+  - User-defined ordering of playlists, albums, artists, album artists and
+    genres, replacing a "Custom" sort that did not sort
+  - List layout alongside the grid on every browse tab
+  - Rewritten drag-to-reorder, including a grid drag engine
+  - On-demand update checks alongside the automatic one
   - Theme presets with matching launcher icons
   - Configurable pause/resume fade; swipe-down-for-lyrics
   - Independent seek-forward and seek-back durations
+  - In-app About section carrying this notice and the licence
   - MAZIKA branding, application id and release pipeline
 
 Bundled third-party code:
