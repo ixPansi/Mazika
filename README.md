@@ -195,7 +195,7 @@ tab in both layouts.
 - **Configurable pause/resume fade**, nested under Fade playback and separate from
   track-transition fades.
 - **Swipe down on the Now Playing cover** to open lyrics; the button still works.
-- **Six one-tap theme presets** — Sunset, MAZIKA Red, Midnight, Forest, Ocean, Daylight.
+- **Six one-tap theme presets** — Sunset, Dark Red, Midnight, Forest, Ocean, Daylight.
   Each sets theme mode and primary colour together and turns Material You off, so the
   colour you pick is the colour you get.
 - **The launcher icon follows the preset.** Android can't recolour a launcher icon at
